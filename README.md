@@ -235,7 +235,33 @@ cc-router setup                                  Interactive setup wizard
 cc-router config show                            Print current config
 cc-router config path                            Print config file path
 cc-router config edit                            Open config in $EDITOR
+cc-router route list                               List routes
+cc-router route add                                Add a new route
+cc-router route edit                               Edit an existing route
+cc-router route remove                             Remove a route
+cc-router route reorder                            Change route priority
 cc-router chat [-m <model>] [--no-stream]        Test chat with a provider
+```
+
+### Route Management
+
+Manage routing rules without editing the config file directly:
+
+```bash
+# List current routes with priority order
+cc-router route list
+
+# Add a new route (interactive)
+cc-router route add
+
+# Edit an existing route's match pattern, provider, or model
+cc-router route edit
+
+# Remove a route
+cc-router route remove
+
+# Reorder routes (priority matters — first match wins)
+cc-router route reorder
 ```
 
 ### Chat Command
