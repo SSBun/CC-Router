@@ -4,6 +4,7 @@ import picomatch from "picomatch";
 import { loadConfig } from "../../config/loader.js";
 import { startServer } from "../../server/index.js";
 import { logger } from "../../utils/logger.js";
+import { printBanner } from "../../utils/banner.js";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -19,6 +20,7 @@ export function registerStartCommand(program: Command): void {
     .option("-d, --daemon", "Run as a background daemon")
     .option("--verbose", "Enable debug logging")
     .action(async (opts: { port?: string; daemon?: boolean; verbose?: boolean }) => {
+      printBanner();
       const config = loadConfig();
 
       if (opts.port) {

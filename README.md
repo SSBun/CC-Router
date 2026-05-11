@@ -50,12 +50,13 @@ Requires Node.js 20+.
 cc-router setup
 ```
 
-The interactive wizard walks you through:
+The interactive wizard walks you through adding providers one by one:
 
-- Choosing providers (Anthropic, OpenAI, DeepSeek, Ollama, or custom)
-- Entering API keys and base URLs
-- Configuring model routing (e.g., opus to Anthropic, sonnet to OpenAI)
-- Setting server host and port
+- Choose provider type (`anthropic-compatible` or `openai-compatible`)
+- Enter provider name, base URL, and API key
+- Add models to the provider
+- Configure routes (map model patterns to providers)
+- Set server host and port
 
 Config is saved to `~/.cc-router/config.yaml`.
 
@@ -119,24 +120,28 @@ server:
 
 providers:
   anthropic:
-    type: "anthropic"
+    type: "anthropic-compatible"
     api_key: "${ANTHROPIC_API_KEY}"
     base_url: "https://api.anthropic.com"
+    models:
+      - "claude-opus-4-20250514"
+      - "claude-sonnet-4-20250514"
+      - "claude-haiku-4-20250514"
 
   openai:
-    type: "openai"
+    type: "openai-compatible"
     api_key: "${OPENAI_API_KEY}"
     base_url: "https://api.openai.com/v1"
+    models:
+      - "gpt-4o"
+      - "o3-mini"
 
   deepseek:
     type: "openai-compatible"
     api_key: "${DEEPSEEK_API_KEY}"
     base_url: "https://api.deepseek.com/v1"
-
-  ollama:
-    type: "openai-compatible"
-    api_key: "ollama"
-    base_url: "http://localhost:11434/v1"
+    models:
+      - "deepseek-chat"
 
 routes:
   - match: "*opus*"
@@ -169,10 +174,23 @@ If the variable is not set, the literal `${VAR_NAME}` is kept and a warning is l
 
 | Type | Description | API Format |
 |------|-------------|------------|
-| `anthropic` | Anthropic API (native) | Anthropic Messages |
-| `anthropic-compatible` | Third-party Anthropic-compatible API | Anthropic Messages |
-| `openai` | OpenAI API | Converted to/from OpenAI Chat Completions |
-| `openai-compatible` | Third-party OpenAI-compatible API | Converted to/from OpenAI Chat Completions |
+| `anthropic-compatible` | Anthropic or Anthropic-compatible API | Anthropic Messages |
+| `openai-compatible` | OpenAI or OpenAI-compatible API | Converted to/from OpenAI Chat Completions |
+
+### Provider Models
+
+Each provider has an optional `models` array listing the model names available from that provider. These are used by the setup wizard when configuring routes.
+
+```yaml
+providers:
+  openai:
+    type: "openai-compatible"
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "https://api.openai.com/v1"
+    models:
+      - "gpt-4o"
+      - "o3-mini"
+```
 
 ### Route Matching
 
@@ -198,6 +216,8 @@ providers:
     type: "anthropic-compatible"
     api_key: "${API_KEY}"
     base_url: "https://my-gateway.example.com"
+    models:
+      - "claude-sonnet-4-20250514"
     headers:
       X-Custom-Auth: "Bearer ${GATEWAY_TOKEN}"
 ```
@@ -207,6 +227,7 @@ providers:
 ```
 cc-router start [-p <port>] [-d] [--verbose]   Start the server
 cc-router stop                                   Stop the daemon
+cc-router restart [-p <port>] [--verbose]        Restart the daemon
 cc-router status                                 Show server status
 cc-router list                                   List providers and routes
 cc-router env                                    Print export statements

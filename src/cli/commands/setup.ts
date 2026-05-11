@@ -1,20 +1,22 @@
 import type { Command } from "commander";
-import { select, input, confirm, checkbox } from "@inquirer/prompts";
+import { select, input, confirm } from "@inquirer/prompts";
+import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { parse } from "yaml";
 import { saveConfig, getConfigPath } from "../../config/loader.js";
 import type { AppConfig } from "../../config/schema.js";
 
-interface ProviderAnswers {
+interface ProviderEntry {
   name: string;
-  type: "anthropic" | "anthropic-compatible" | "openai" | "openai-compatible";
+  type: "anthropic-compatible" | "openai-compatible";
   api_key: string;
   base_url: string;
+  models: string[];
 }
 
-const PROVIDER_DEFAULTS: Record<string, { type: string; base_url: string }> = {
-  anthropic: { type: "anthropic", base_url: "https://api.anthropic.com" },
-  openai: { type: "openai", base_url: "https://api.openai.com/v1" },
-  deepseek: { type: "openai-compatible", base_url: "https://api.deepseek.com/v1" },
-  ollama: { type: "openai-compatible", base_url: "http://localhost:11434/v1" },
+const TYPE_DEFAULTS: Record<string, string> = {
+  "anthropic-compatible": "https://api.anthropic.com",
+  "openai-compatible": "https://api.openai.com/v1",
 };
 
 export function registerSetupCommand(program: Command): void {
@@ -24,99 +26,141 @@ export function registerSetupCommand(program: Command): void {
     .action(async () => {
       console.log("CC-Router Setup\n");
 
-      // Step 1: Choose providers
-      const selectedProviders = await checkbox({
-        message: "Which providers do you want to configure?",
-        choices: [
-          { name: "Anthropic", value: "anthropic" },
-          { name: "OpenAI", value: "openai" },
-          { name: "DeepSeek", value: "deepseek" },
-          { name: "Ollama (local)", value: "ollama" },
-          { name: "Custom (Anthropic-compatible)", value: "custom-anthropic" },
-          { name: "Custom (OpenAI-compatible)", value: "custom" },
-        ],
-        required: true,
-      });
+      // Step 1: Add providers
+      const providers: Record<string, ProviderEntry> = {};
 
-      // Step 2: Configure each provider
-      const providers: Record<string, ProviderAnswers> = {};
+      while (true) {
+        const hasProviders = Object.keys(providers).length > 0;
+        const addMore = await confirm({
+          message: hasProviders ? "Add another provider?" : "Add a provider?",
+          default: !hasProviders,
+        });
 
-      for (const providerKey of selectedProviders) {
-        const defaults = PROVIDER_DEFAULTS[providerKey] ?? {
-          type: providerKey === "custom-anthropic" ? "anthropic-compatible" : "openai-compatible",
-          base_url: "",
-        };
+        if (!addMore) break;
 
-        console.log(`\n--- ${providerKey} ---`);
+        const type = await select({
+          message: "Provider type:",
+          choices: [
+            { name: "Anthropic-compatible", value: "anthropic-compatible" as const },
+            { name: "OpenAI-compatible", value: "openai-compatible" as const },
+          ],
+        });
 
-        const name =
-          providerKey === "custom" || providerKey === "custom-anthropic"
-            ? await input({ message: "Provider name (lowercase, e.g. groq, bigmodel):" })
-            : providerKey;
-
-        const apiKey = await input({
-          message: "API key:",
-          default: providerKey === "ollama" ? "ollama" : "",
+        const name = await input({
+          message: "Provider name (e.g. anthropic, openai, deepseek):",
+          validate: (v: string) => {
+            if (!v.trim()) return "Name is required";
+            if (providers[v.trim()]) return "Provider already exists";
+            return true;
+          },
         });
 
         const baseUrl = await input({
           message: "Base URL:",
-          default: defaults.base_url,
+          default: TYPE_DEFAULTS[type],
         });
 
-        const type = defaults.type as ProviderAnswers["type"];
+        const apiKey = await input({
+          message: "API key (or env var like ${MY_API_KEY}):",
+        });
 
-        providers[name] = {
-          name,
+        const models: string[] = [];
+        while (true) {
+          const addModel = await confirm({
+            message: models.length === 0 ? "Add a model?" : "Add another model?",
+            default: models.length === 0,
+          });
+          if (!addModel) break;
+
+          const modelName = await input({
+            message: "Model name (e.g. claude-sonnet-4-20250514, gpt-4o):",
+            validate: (v: string) => (v.trim() ? true : "Model name is required"),
+          });
+          models.push(modelName.trim());
+        }
+
+        providers[name.trim()] = {
+          name: name.trim(),
           type,
           api_key: apiKey,
           base_url: baseUrl,
+          models,
         };
+
+        console.log(`  Added provider "${name.trim()}" with ${models.length} model(s)\n`);
       }
 
-      // Step 3: Configure model routing
-      const providerNames = Object.keys(providers);
-      const routes: Array<{ match: string; provider: string; model?: string }> = [];
+      if (Object.keys(providers).length === 0) {
+        console.log("No providers added. Exiting.");
+        process.exit(1);
+      }
 
-      const slots = [
-        { label: "opus (most capable)", match: "opus" },
-        { label: "sonnet (balanced)", match: "sonnet" },
-        { label: "haiku (fastest)", match: "haiku" },
-      ];
+      // Step 2: Configure routes — pick a model for each tier
+      const routes: Array<{ match: string; provider: string; model: string }> = [];
 
-      const configureRouting = await confirm({
-        message: "Configure model routing (e.g. opus → Anthropic, sonnet → OpenAI)?",
-        default: true,
-      });
+      // Build flat list of all models across all providers
+      const allModelChoices = Object.entries(providers).flatMap(([pName, p]) =>
+        p.models.map((m) => ({
+          name: `${m} (${pName})`,
+          value: { provider: pName, model: m } as { provider: string; model: string },
+        })),
+      );
 
-      if (configureRouting) {
-        for (const slot of slots) {
-          const useSlot = await confirm({
-            message: `Configure ${slot.label} routing?`,
-            default: true,
+      console.log("\n--- Configure Model Routing ---\n");
+
+      const tiers = [
+        { label: "Opus (most capable)", match: "*opus*" },
+        { label: "Sonnet (balanced)", match: "*sonnet*" },
+        { label: "Haiku (fastest)", match: "*haiku*" },
+      ] as const;
+
+      for (const tier of tiers) {
+        if (allModelChoices.length === 0) break;
+
+        const configure = await confirm({
+          message: `Configure ${tier.label} routing?`,
+          default: true,
+        });
+
+        if (!configure) continue;
+
+        const chosen = await select({
+          message: `Which model for ${tier.label}?`,
+          choices: allModelChoices,
+        });
+
+        routes.push({
+          match: tier.match,
+          provider: chosen.provider,
+          model: chosen.model,
+        });
+
+        console.log(`  ${tier.label}: ${chosen.model} → ${chosen.provider}\n`);
+      }
+
+      // Catch-all route
+      if (routes.length > 0) {
+        const addCatchAll = await confirm({
+          message: "Add a catch-all route for unmatched models?",
+          default: true,
+        });
+
+        if (addCatchAll) {
+          const chosen = await select({
+            message: "Which model for catch-all?",
+            choices: allModelChoices,
           });
-
-          if (!useSlot) continue;
-
-          const provider = await select({
-            message: `Which provider for ${slot.label}?`,
-            choices: providerNames.map((p) => ({ name: p, value: p })),
-          });
-
-          const modelName = await input({
-            message: `Model name for ${slot.label} (e.g. claude-opus-4-20250514, gpt-4o):`,
-          });
-
-          routes.push({
-            match: `*${slot.match}*`,
-            provider,
-            model: modelName,
-          });
+          routes.push({ match: "*", provider: chosen.provider, model: chosen.model });
+          console.log(`  Catch-all: ${chosen.model} → ${chosen.provider}\n`);
         }
-      }
-
-      // Ensure at least one catch-all route
-      if (routes.length === 0) {
+      } else if (allModelChoices.length > 0) {
+        const chosen = await select({
+          message: "Select default model (catch-all route):",
+          choices: allModelChoices,
+        });
+        routes.push({ match: "*", provider: chosen.provider, model: chosen.model });
+      } else {
+        const providerNames = Object.keys(providers);
         const defaultProvider = await select({
           message: "Select default provider (catch-all route):",
           choices: providerNames.map((p) => ({ name: p, value: p })),
@@ -124,7 +168,9 @@ export function registerSetupCommand(program: Command): void {
         routes.push({ match: "*", provider: defaultProvider });
       }
 
-      // Step 4: Server config
+      // Step 3: Server config
+      console.log("\n--- Server Config ---\n");
+
       const host = await input({
         message: "Server host:",
         default: "127.0.0.1",
@@ -135,17 +181,37 @@ export function registerSetupCommand(program: Command): void {
         default: "8787",
       });
 
-      // Step 5: Build and save config
+      // Step 4: Build and save config
+      // Reuse existing auth_token if config file already exists
+      let existingToken = "";
+      try {
+        const configPath = getConfigPath();
+        if (existsSync(configPath)) {
+          const raw = parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
+          const server = raw?.server as Record<string, unknown> | undefined;
+          if (server?.auth_token && typeof server.auth_token === "string") {
+            existingToken = server.auth_token;
+          }
+        }
+      } catch { /* ignore */ }
+
+      const authToken = existingToken || randomUUID();
+
       const config: AppConfig = {
         server: {
           host,
           port: parseInt(port, 10),
-          auth_token: "",
+          auth_token: authToken,
         },
         providers: Object.fromEntries(
           Object.entries(providers).map(([name, p]) => [
             name,
-            { type: p.type, api_key: p.api_key, base_url: p.base_url },
+            {
+              type: p.type,
+              api_key: p.api_key,
+              base_url: p.base_url,
+              models: p.models,
+            },
           ]),
         ),
         routes,
@@ -161,13 +227,16 @@ export function registerSetupCommand(program: Command): void {
       console.log("Then add these to your shell:");
       console.log(`export ANTHROPIC_BASE_URL="http://${host}:${port}"`);
       console.log(`export ANTHROPIC_AUTH_TOKEN="${config.server.auth_token}"`);
-      for (const route of routes) {
-        const key = route.match
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, "_")
-          .replace(/^_+|_+$/g, "");
-        if (route.model) {
-          console.log(`export ANTHROPIC_DEFAULT_${key}_MODEL="${route.model}"`);
+      const MODEL_TIERS = [
+        { match: "*opus*", envVar: "ANTHROPIC_DEFAULT_OPUS_MODEL" },
+        { match: "*sonnet*", envVar: "ANTHROPIC_DEFAULT_SONNET_MODEL" },
+        { match: "*haiku*", envVar: "ANTHROPIC_DEFAULT_HAIKU_MODEL" },
+      ] as const;
+
+      for (const tier of MODEL_TIERS) {
+        const route = routes.find((r) => r.match === tier.match);
+        if (route?.model) {
+          console.log(`export ${tier.envVar}="${route.model}"`);
         }
       }
       console.log();

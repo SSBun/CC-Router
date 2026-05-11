@@ -7,8 +7,11 @@ import { registerEnvCommand } from "./cli/commands/env.js";
 import { registerSetupCommand } from "./cli/commands/setup.js";
 import { registerConfigCommand } from "./cli/commands/config.js";
 import { registerChatCommand } from "./cli/commands/chat.js";
+import { registerRestartCommand } from "./cli/commands/restart.js";
+import { registerRouteCommand } from "./cli/commands/route.js";
 import { loadConfig } from "./config/loader.js";
 import { startServer } from "./server/index.js";
+import { printBanner, VERSION } from "./utils/banner.js";
 
 const program = new Command();
 
@@ -17,7 +20,7 @@ program
   .description(
     "Multi-provider model router for Claude Code — route different models to different LLM providers",
   )
-  .version("0.1.0");
+  .version(VERSION);
 
 registerStartCommand(program);
 registerStopCommand(program);
@@ -27,6 +30,8 @@ registerEnvCommand(program);
 registerSetupCommand(program);
 registerConfigCommand(program);
 registerChatCommand(program);
+registerRestartCommand(program);
+registerRouteCommand(program);
 
 // Internal command for daemon mode (forked process runs the server directly)
 program
@@ -44,5 +49,9 @@ program
     }
     await startServer(config);
   });
+
+if (process.argv.length <= 2) {
+  printBanner();
+}
 
 program.parse();

@@ -10,7 +10,7 @@ describe("AppConfigSchema", () => {
     },
     providers: {
       anthropic: {
-        type: "anthropic",
+        type: "anthropic-compatible",
         api_key: "sk-ant-test",
         base_url: "https://api.anthropic.com",
       },
@@ -27,7 +27,7 @@ describe("AppConfigSchema", () => {
     expect(result.server.host).toBe("127.0.0.1");
     expect(result.server.port).toBe(8787);
     expect(result.server.auth_token).toBe("my-secret-token");
-    expect(result.providers.anthropic.type).toBe("anthropic");
+    expect(result.providers.anthropic.type).toBe("anthropic-compatible");
     expect(result.routes).toHaveLength(1);
     expect(result.log_level).toBe("info");
   });
@@ -37,7 +37,7 @@ describe("AppConfigSchema", () => {
       server: {},  // server is required but inner fields have defaults
       providers: {
         anthropic: {
-          type: "anthropic",
+          type: "anthropic-compatible",
           api_key: "sk-test",
           base_url: "https://api.anthropic.com",
         },
@@ -56,7 +56,7 @@ describe("AppConfigSchema", () => {
       server: { host: "0.0.0.0", port: 3000, auth_token: "tok" },
       providers: {
         anthropic: {
-          type: "anthropic",
+          type: "anthropic-compatible",
           api_key: "sk-test",
           base_url: "https://api.anthropic.com",
         },
@@ -83,7 +83,7 @@ describe("AppConfigSchema", () => {
         server: { host: "127.0.0.1", port: 8787, auth_token: "tok" },
         providers: {
           anthropic: {
-            type: "anthropic",
+            type: "anthropic-compatible",
             api_key: "sk-test",
             base_url: "https://api.anthropic.com",
           },
@@ -114,7 +114,7 @@ describe("AppConfigSchema", () => {
         ...validConfig,
         providers: {
           anthropic: {
-            type: "anthropic",
+            type: "anthropic-compatible",
             base_url: "https://api.anthropic.com",
           },
         },
@@ -128,7 +128,7 @@ describe("AppConfigSchema", () => {
         ...validConfig,
         providers: {
           anthropic: {
-            type: "anthropic",
+            type: "anthropic-compatible",
             api_key: "sk-test",
           },
         },
@@ -142,7 +142,7 @@ describe("AppConfigSchema", () => {
         ...validConfig,
         providers: {
           anthropic: {
-            type: "anthropic",
+            type: "anthropic-compatible",
             api_key: "sk-test",
             base_url: "not-a-url",
           },
@@ -152,7 +152,7 @@ describe("AppConfigSchema", () => {
   });
 
   it("accepts all valid provider types", () => {
-    for (const type of ["anthropic", "openai", "openai-compatible"] as const) {
+    for (const type of ["anthropic-compatible", "openai-compatible"] as const) {
       const result = AppConfigSchema.parse({
         ...validConfig,
         providers: {
@@ -172,7 +172,7 @@ describe("AppConfigSchema", () => {
       ...validConfig,
       providers: {
         anthropic: {
-          type: "anthropic",
+          type: "anthropic-compatible",
           api_key: "sk-test",
           base_url: "https://api.anthropic.com",
           headers: { "X-Custom": "value" },

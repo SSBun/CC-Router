@@ -69,10 +69,11 @@ export interface AnthropicSSEEvent {
 }
 
 export interface ProviderConfig {
-  type: "anthropic" | "anthropic-compatible" | "openai" | "openai-compatible";
+  type: "anthropic-compatible" | "openai-compatible";
   api_key: string;
   base_url: string;
   headers?: Record<string, string>;
+  models?: string[];
 }
 
 export interface ProviderAdapter {

@@ -1,12 +1,13 @@
 import { z } from "zod";
 
-const ProviderType = z.enum(["anthropic", "anthropic-compatible", "openai", "openai-compatible"]);
+const ProviderType = z.enum(["anthropic-compatible", "openai-compatible"]);
 
 export const ProviderSchema = z.object({
   type: ProviderType,
   api_key: z.string(),
   base_url: z.string().url(),
   headers: z.record(z.string()).optional(),
+  models: z.array(z.string()).default([]),
 });
 
 export const RouteSchema = z.object({

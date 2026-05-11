@@ -16,6 +16,9 @@ export function registerListCommand(program: Command): void {
         if (provider.headers) {
           console.log(`    headers:  ${Object.keys(provider.headers).join(", ")}`);
         }
+        if (provider.models && provider.models.length > 0) {
+          console.log(`    models:   ${provider.models.join(", ")}`);
+        }
         console.log();
       }
 
