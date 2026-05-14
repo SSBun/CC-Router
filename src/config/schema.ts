@@ -2,12 +2,22 @@ import { z } from "zod";
 
 const ProviderType = z.enum(["anthropic-compatible", "openai-compatible"]);
 
+const ModelDefSchema = z.object({
+  id: z.string(),
+  context_window: z.number().int().positive().optional(),
+});
+
 export const ProviderSchema = z.object({
   type: ProviderType,
   api_key: z.string(),
   base_url: z.string().url(),
   headers: z.record(z.string()).optional(),
-  models: z.array(z.string()).default([]),
+  models: z
+    .array(z.union([z.string(), ModelDefSchema]))
+    .default([])
+    .transform((arr) =>
+      arr.map((m) => (typeof m === "string" ? { id: m } : m)),
+    ),
 });
 
 export const RouteSchema = z.object({

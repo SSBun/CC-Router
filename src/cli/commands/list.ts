@@ -17,7 +17,11 @@ export function registerListCommand(program: Command): void {
           console.log(`    headers:  ${Object.keys(provider.headers).join(", ")}`);
         }
         if (provider.models && provider.models.length > 0) {
-          console.log(`    models:   ${provider.models.join(", ")}`);
+          console.log(`    models:`);
+          for (const m of provider.models) {
+            const cw = m.context_window ? ` (${(m.context_window / 1000).toFixed(0)}K)` : "";
+            console.log(`      - ${m.id}${cw}`);
+          }
         }
         console.log();
       }

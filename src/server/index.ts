@@ -5,6 +5,7 @@ import type { AppConfig } from "../config/schema.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { createMessagesHandler } from "./routes/messages.js";
+import { createModelsHandler } from "./routes/models.js";
 import { logger } from "../utils/logger.js";
 
 export function createApp(config: AppConfig): Hono {
@@ -15,6 +16,7 @@ export function createApp(config: AppConfig): Hono {
   app.onError(errorHandler);
 
   app.post("/v1/messages", createMessagesHandler(config));
+  app.get("/v1/models", createModelsHandler(config));
 
   return app;
 }

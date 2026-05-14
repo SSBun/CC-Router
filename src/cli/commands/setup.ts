@@ -11,7 +11,7 @@ interface ProviderEntry {
   type: "anthropic-compatible" | "openai-compatible";
   api_key: string;
   base_url: string;
-  models: string[];
+  models: Array<{ id: string; context_window?: number }>;
 }
 
 const TYPE_DEFAULTS: Record<string, string> = {
@@ -24,9 +24,10 @@ export function registerSetupCommand(program: Command): void {
     .command("setup")
     .description("Interactive setup wizard")
     .action(async () => {
-      console.log("CC-Router Setup\n");
+      try {
+        console.log("CC-Router Setup\n");
 
-      // Step 1: Add providers
+        // Step 1: Add providers
       const providers: Record<string, ProviderEntry> = {};
 
       while (true) {
@@ -64,7 +65,7 @@ export function registerSetupCommand(program: Command): void {
           message: "API key (or env var like ${MY_API_KEY}):",
         });
 
-        const models: string[] = [];
+        const models: Array<{ id: string; context_window?: number }> = [];
         while (true) {
           const addModel = await confirm({
             message: models.length === 0 ? "Add a model?" : "Add another model?",
@@ -72,11 +73,23 @@ export function registerSetupCommand(program: Command): void {
           });
           if (!addModel) break;
 
-          const modelName = await input({
+          const modelId = await input({
             message: "Model name (e.g. claude-sonnet-4-20250514, gpt-4o):",
             validate: (v: string) => (v.trim() ? true : "Model name is required"),
           });
-          models.push(modelName.trim());
+
+          const contextWindowStr = await input({
+            message: "Context window (press Enter to skip):",
+            default: "",
+          });
+          const contextWindow = contextWindowStr.trim()
+            ? parseInt(contextWindowStr.trim(), 10)
+            : undefined;
+
+          models.push({
+            id: modelId.trim(),
+            ...(contextWindow && Number.isFinite(contextWindow) ? { context_window: contextWindow } : {}),
+          });
         }
 
         providers[name.trim()] = {
@@ -101,8 +114,8 @@ export function registerSetupCommand(program: Command): void {
       // Build flat list of all models across all providers
       const allModelChoices = Object.entries(providers).flatMap(([pName, p]) =>
         p.models.map((m) => ({
-          name: `${m} (${pName})`,
-          value: { provider: pName, model: m } as { provider: string; model: string },
+          name: `${m.id} (${pName})`,
+          value: { provider: pName, model: m.id } as { provider: string; model: string },
         })),
       );
 
@@ -240,5 +253,12 @@ export function registerSetupCommand(program: Command): void {
         }
       }
       console.log();
+      } catch (err) {
+        if (err instanceof Error && err.name === "ExitPromptError") {
+          console.log("\nSetup cancelled.");
+          process.exit(0);
+        }
+        throw err;
+      }
     });
 }

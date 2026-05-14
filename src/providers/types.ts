@@ -68,12 +68,17 @@ export interface AnthropicSSEEvent {
   data: unknown;
 }
 
+export interface ModelDef {
+  id: string;
+  context_window?: number;
+}
+
 export interface ProviderConfig {
   type: "anthropic-compatible" | "openai-compatible";
   api_key: string;
   base_url: string;
   headers?: Record<string, string>;
-  models?: string[];
+  models?: ModelDef[];
 }
 
 export interface ProviderAdapter {
