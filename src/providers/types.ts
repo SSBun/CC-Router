@@ -70,7 +70,8 @@ export interface AnthropicSSEEvent {
 
 export interface ModelDef {
   id: string;
-  context_window?: number;
+  max_input_tokens?: number;
+  max_tokens?: number;
 }
 
 export interface ProviderConfig {

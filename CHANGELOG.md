@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0] — 2026-05-14
+
+### Added
+- Context window suffix (`[200k]`, `[1m]`) in `/v1/models` response model IDs — Claude Code displays it in model picker
+- `ANTHROPIC_DEFAULT_*_MODEL` env exports now include context window suffix
+- Exact model name matching in router before glob pattern fallback
+- `stripContextSuffix()` utility routes suffixed model names correctly
+
+### Changed
+- Token field rename to match Anthropic API: `context_window` → `max_input_tokens`, `max_output_tokens` → `max_tokens`
+- Backward-compatible schema: old `context_window` field auto-transforms to `max_input_tokens`
+- Model routing: exact provider model list match checked before glob patterns (`*opus*`, `*sonnet*`, etc.)
+- `cc-router models` table columns: "Context Window" → "Max Input", "Max Output" → "Max Tokens"
+
 ## [0.4.0] — 2026-05-15
 
 ### Added

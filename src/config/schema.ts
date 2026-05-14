@@ -5,7 +5,15 @@ const ProviderType = z.enum(["anthropic-compatible", "openai-compatible"]);
 const ModelDefSchema = z.object({
   id: z.string(),
   context_window: z.number().int().positive().optional(),
-});
+  max_input_tokens: z.number().int().positive().optional(),
+  max_tokens: z.number().int().positive().optional(),
+}).transform((m) => ({
+  id: m.id,
+  max_input_tokens: m.max_input_tokens ?? m.context_window,
+  max_tokens: m.max_tokens,
+}));
+
+export type ModelDef = z.output<typeof ModelDefSchema>;
 
 export const ProviderSchema = z.object({
   type: ProviderType,
@@ -16,7 +24,7 @@ export const ProviderSchema = z.object({
     .array(z.union([z.string(), ModelDefSchema]))
     .default([])
     .transform((arr) =>
-      arr.map((m) => (typeof m === "string" ? { id: m } : m)),
+      arr.map((m) => (typeof m === "string" ? { id: m, max_input_tokens: undefined as number | undefined, max_tokens: undefined as number | undefined } : m)),
     ),
 });
 

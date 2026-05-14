@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import picomatch from "picomatch";
 import { loadConfig } from "../../config/loader.js";
+import { modelIdWithSuffix } from "../../model-info/resolver.js";
 import { printBanner } from "../../utils/banner.js";
 
 const PID_DIR = join(homedir(), ".cc-router");
@@ -21,7 +22,7 @@ function printModelExports(config: ReturnType<typeof loadConfig>): void {
     for (const route of config.routes) {
       if (route.match === "*" || route.match === "**") continue;
       if (picomatch(route.match)(tier.probeModel)) {
-        const model = route.model ?? route.match;
+        const model = modelIdWithSuffix(route.model ?? route.match, config);
         console.log(`export ${tier.envVar}="${model}"`);
         break;
       }

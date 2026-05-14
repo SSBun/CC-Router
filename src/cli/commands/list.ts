@@ -19,7 +19,7 @@ export function registerListCommand(program: Command): void {
         if (provider.models && provider.models.length > 0) {
           console.log(`    models:`);
           for (const m of provider.models) {
-            const cw = m.context_window ? ` (${(m.context_window / 1000).toFixed(0)}K)` : "";
+            const cw = m.max_input_tokens ? ` (${(m.max_input_tokens / 1000).toFixed(0)}K)` : "";
             console.log(`      - ${m.id}${cw}`);
           }
         }

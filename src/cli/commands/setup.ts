@@ -11,7 +11,7 @@ interface ProviderEntry {
   type: "anthropic-compatible" | "openai-compatible";
   api_key: string;
   base_url: string;
-  models: Array<{ id: string; context_window?: number }>;
+  models: AppConfig["providers"][string]["models"];
 }
 
 const TYPE_DEFAULTS: Record<string, string> = {
@@ -65,7 +65,7 @@ export function registerSetupCommand(program: Command): void {
           message: "API key (or env var like ${MY_API_KEY}):",
         });
 
-        const models: Array<{ id: string; context_window?: number }> = [];
+        const models: ProviderEntry["models"] = [];
         while (true) {
           const addModel = await confirm({
             message: models.length === 0 ? "Add a model?" : "Add another model?",
@@ -78,17 +78,26 @@ export function registerSetupCommand(program: Command): void {
             validate: (v: string) => (v.trim() ? true : "Model name is required"),
           });
 
-          const contextWindowStr = await input({
-            message: "Context window (press Enter to skip):",
+          const maxInputStr = await input({
+            message: "Max input tokens (press Enter to skip):",
             default: "",
           });
-          const contextWindow = contextWindowStr.trim()
-            ? parseInt(contextWindowStr.trim(), 10)
+          const maxInput = maxInputStr.trim()
+            ? parseInt(maxInputStr.trim(), 10)
+            : undefined;
+
+          const maxTokensStr = await input({
+            message: "Max output tokens (press Enter to skip):",
+            default: "",
+          });
+          const maxTokens = maxTokensStr.trim()
+            ? parseInt(maxTokensStr.trim(), 10)
             : undefined;
 
           models.push({
             id: modelId.trim(),
-            ...(contextWindow && Number.isFinite(contextWindow) ? { context_window: contextWindow } : {}),
+            max_input_tokens: (maxInput && Number.isFinite(maxInput)) ? maxInput : undefined,
+            max_tokens: (maxTokens && Number.isFinite(maxTokens)) ? maxTokens : undefined,
           });
         }
 
@@ -109,7 +118,7 @@ export function registerSetupCommand(program: Command): void {
       }
 
       // Step 2: Configure routes — pick a model for each tier
-      const routes: Array<{ match: string; provider: string; model: string }> = [];
+      const routes: Array<{ match: string; provider: string; model?: string }> = [];
 
       // Build flat list of all models across all providers
       const allModelChoices = Object.entries(providers).flatMap(([pName, p]) =>
@@ -249,7 +258,17 @@ export function registerSetupCommand(program: Command): void {
       for (const tier of MODEL_TIERS) {
         const route = routes.find((r) => r.match === tier.match);
         if (route?.model) {
-          console.log(`export ${tier.envVar}="${route.model}"`);
+          const modelId = route.model;
+          let ctx = "";
+          for (const p of Object.values(providers)) {
+            const m = p.models.find((m) => m.id === modelId);
+            if (m?.max_input_tokens) {
+              const n = m.max_input_tokens;
+              ctx = n >= 1_000_000 ? `[${(n / 1_000_000).toFixed(0)}m]` : `[${(n / 1000).toFixed(0)}k]`;
+              break;
+            }
+          }
+          console.log(`export ${tier.envVar}="${modelId}${ctx}"`);
         }
       }
       console.log();

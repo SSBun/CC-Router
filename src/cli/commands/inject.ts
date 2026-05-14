@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import picomatch from "picomatch";
 import { loadConfig } from "../../config/loader.js";
+import { modelIdWithSuffix } from "../../model-info/resolver.js";
 import { logger } from "../../utils/logger.js";
 
 const SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
@@ -26,7 +27,7 @@ function generateEnvVars(): Record<string, string> {
   // Catch-all route goes to ANTHROPIC_MODEL
   for (const route of config.routes) {
     if (route.match === "*" || route.match === "**") {
-      env["ANTHROPIC_MODEL"] = route.model ?? route.match;
+      env["ANTHROPIC_MODEL"] = modelIdWithSuffix(route.model ?? route.match, config);
       break;
     }
   }
@@ -36,7 +37,7 @@ function generateEnvVars(): Record<string, string> {
     for (const route of config.routes) {
       if (route.match === "*" || route.match === "**") continue;
       if (picomatch(route.match)(tier.probeModel)) {
-        env[tier.envVar] = route.model ?? route.match;
+        env[tier.envVar] = modelIdWithSuffix(route.model ?? route.match, config);
         break;
       }
     }

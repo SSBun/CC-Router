@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import picomatch from "picomatch";
 import { loadConfig } from "../../config/loader.js";
+import { modelIdWithSuffix } from "../../model-info/resolver.js";
 
 const MODEL_TIERS = [
   { envVar: "ANTHROPIC_DEFAULT_OPUS_MODEL", probeModel: "claude-opus-4-20250514" },
@@ -23,7 +24,7 @@ export function registerEnvCommand(program: Command): void {
         for (const route of config.routes) {
           if (route.match === "*" || route.match === "**") continue;
           if (picomatch(route.match)(tier.probeModel)) {
-            const model = route.model ?? route.match;
+            const model = modelIdWithSuffix(route.model ?? route.match, config);
             console.log(`export ${tier.envVar}="${model}"`);
             break;
           }

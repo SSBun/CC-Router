@@ -133,11 +133,11 @@ providers:
     base_url: "https://api.anthropic.com"
     models:
       - id: "claude-opus-4-20250514"
-        context_window: 1000000
+        max_input_tokens: 1000000
       - id: "claude-sonnet-4-20250514"
-        context_window: 1000000
+        max_input_tokens: 1000000
       - id: "claude-haiku-4-20251001"
-        context_window: 200000
+        max_input_tokens: 200000
 
   openai:
     type: "openai-compatible"
@@ -153,7 +153,7 @@ providers:
     base_url: "https://api.deepseek.com/v1"
     models:
       - id: "deepseek-chat"
-        context_window: 1000000
+        max_input_tokens: 1000000
 
 routes:
   - match: "*opus*"
@@ -191,7 +191,7 @@ If the variable is not set, the literal `${VAR_NAME}` is kept and a warning is l
 
 ### Provider Models
 
-Each provider has an optional `models` array. Models can be simple strings or objects with `context_window` metadata:
+Each provider has an optional `models` array. Models can be simple strings or objects with `max_input_tokens` and `max_tokens`:
 
 ```yaml
 providers:
@@ -201,8 +201,9 @@ providers:
     base_url: "https://api.openai.com/v1"
     models:
       - "gpt-4o"                       # simple string
-      - id: "o3-mini"                  # with context window
-        context_window: 200000
+      - id: "o3-mini"                  # with token limits
+        max_input_tokens: 200000
+        max_tokens: 16000
 ```
 
 Context window resolution priority: provider config → built-in database → tier inference. The built-in database covers 15+ models (GLM + DeepSeek).

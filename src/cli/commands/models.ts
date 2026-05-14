@@ -17,25 +17,25 @@ function renderTable(): void {
   const cols = {
     id: Math.max(2, ...entries.map((e) => e.id.length)),
     display: Math.max(12, ...entries.map((e) => e.display_name.length)),
-    ctx: 14,
+    input: 14,
     out: 13,
   };
 
   const sep = (left: string, mid: string, right: string) =>
     left + "─".repeat(cols.id + 2) + mid
       + "─".repeat(cols.display + 2) + mid
-      + "─".repeat(cols.ctx + 2) + mid
+      + "─".repeat(cols.input + 2) + mid
       + "─".repeat(cols.out + 2) + right;
 
-  const row = (id: string, display: string, ctx: string, out: string) =>
-    `│ ${pad(id, cols.id)} │ ${pad(display, cols.display)} │ ${pad(ctx, cols.ctx)} │ ${pad(out, cols.out)} │`;
+  const row = (id: string, display: string, input: string, out: string) =>
+    `│ ${pad(id, cols.id)} │ ${pad(display, cols.display)} │ ${pad(input, cols.input)} │ ${pad(out, cols.out)} │`;
 
   console.log(sep("┌", "┬", "┐"));
-  console.log(row("ID", "Display Name", "Context Window", "Max Output"));
+  console.log(row("ID", "Display Name", "Max Input", "Max Tokens"));
   console.log(sep("├", "┼", "┤"));
 
   for (const e of entries) {
-    console.log(row(e.id, e.display_name, formatContext(e.context_window), formatContext(e.max_output_tokens)));
+    console.log(row(e.id, e.display_name, formatContext(e.max_input_tokens), formatContext(e.max_tokens)));
   }
 
   console.log(sep("└", "┴", "┘"));
@@ -54,9 +54,9 @@ export function registerModelsCommand(program: Command): void {
           process.exit(1);
         }
         console.log(`  ${entry.display_name} (${entry.id})`);
-        console.log(`    context_window:    ${formatContext(entry.context_window)}`);
-        console.log(`    max_output_tokens: ${formatContext(entry.max_output_tokens)}`);
-        console.log(`    description:       ${entry.description}`);
+        console.log(`    max_input_tokens: ${formatContext(entry.max_input_tokens)}`);
+        console.log(`    max_tokens:       ${formatContext(entry.max_tokens)}`);
+        console.log(`    description:      ${entry.description}`);
         return;
       }
 
