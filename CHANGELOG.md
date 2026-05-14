@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0] — 2026-05-15
+
+### Added
+- Model list view in macOS client provider form — add/edit/remove models with context window
+- `cc-router inject` populates `~/.claude/settings.json` with cc-router env vars
+- `cc-router models` shows built-in model database in table format
+- Backward-compatible `{id, context_window}` model format in YAML config
+- macOS client parses `context_window` from `/v1/models` API responses
+
+### Changed
+- Provider models config changed from `string[]` to `[{id, context_window?}]` objects
+- macOS client models field redesigned from plain text editor to interactive list
+- `/v1/models` endpoint now reads context_window from provider config > built-in DB > tier inference
+
 ## [0.3.0] — 2026-05-15
 
 ### Added

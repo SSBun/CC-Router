@@ -81,12 +81,20 @@ Add the printed exports to your shell (e.g., `~/.zshrc` or `~/.bashrc`):
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
 export ANTHROPIC_AUTH_TOKEN="<generated-token>"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-20250514"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="gpt-4o"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="deepseek-chat"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-5.1"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="deepseek-v4-pro"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="deepseek-v4-flash"
 ```
 
-Or print them anytime:
+Or auto-inject them into Claude Code's settings:
+
+```bash
+cc-router inject
+```
+
+This writes the env vars into `~/.claude/settings.json` (with backup).
+
+Print exports manually anytime:
 
 ```bash
 cc-router env
@@ -124,9 +132,12 @@ providers:
     api_key: "${ANTHROPIC_API_KEY}"
     base_url: "https://api.anthropic.com"
     models:
-      - "claude-opus-4-20250514"
-      - "claude-sonnet-4-20250514"
-      - "claude-haiku-4-20250514"
+      - id: "claude-opus-4-20250514"
+        context_window: 1000000
+      - id: "claude-sonnet-4-20250514"
+        context_window: 1000000
+      - id: "claude-haiku-4-20251001"
+        context_window: 200000
 
   openai:
     type: "openai-compatible"
@@ -141,7 +152,8 @@ providers:
     api_key: "${DEEPSEEK_API_KEY}"
     base_url: "https://api.deepseek.com/v1"
     models:
-      - "deepseek-chat"
+      - id: "deepseek-chat"
+        context_window: 1000000
 
 routes:
   - match: "*opus*"
@@ -179,7 +191,7 @@ If the variable is not set, the literal `${VAR_NAME}` is kept and a warning is l
 
 ### Provider Models
 
-Each provider has an optional `models` array listing the model names available from that provider. These are used by the setup wizard when configuring routes.
+Each provider has an optional `models` array. Models can be simple strings or objects with `context_window` metadata:
 
 ```yaml
 providers:
@@ -188,8 +200,18 @@ providers:
     api_key: "${OPENAI_API_KEY}"
     base_url: "https://api.openai.com/v1"
     models:
-      - "gpt-4o"
-      - "o3-mini"
+      - "gpt-4o"                       # simple string
+      - id: "o3-mini"                  # with context window
+        context_window: 200000
+```
+
+Context window resolution priority: provider config → built-in database → tier inference. The built-in database covers 15+ models (GLM + DeepSeek).
+
+Query the database:
+
+```bash
+cc-router models          # list all known models in table format
+cc-router models glm-5.1  # show details for a specific model
 ```
 
 ### Route Matching
@@ -232,14 +254,16 @@ cc-router status                                 Show server status
 cc-router list                                   List providers and routes
 cc-router env                                    Print export statements
 cc-router setup                                  Interactive setup wizard
+cc-router inject                                 Inject env vars into Claude Code settings
+cc-router models [<id>]                          Query built-in model database
 cc-router config show                            Print current config
 cc-router config path                            Print config file path
 cc-router config edit                            Open config in $EDITOR
-cc-router route list                               List routes
-cc-router route add                                Add a new route
-cc-router route edit                               Edit an existing route
-cc-router route remove                             Remove a route
-cc-router route reorder                            Change route priority
+cc-router route list                             List routes
+cc-router route add                              Add a new route
+cc-router route edit                             Edit an existing route
+cc-router route remove                           Remove a route
+cc-router route reorder                          Change route priority
 cc-router chat [-m <model>] [--no-stream]        Test chat with a provider
 ```
 
