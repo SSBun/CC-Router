@@ -24,14 +24,6 @@ function generateEnvVars(): Record<string, string> {
   env["ANTHROPIC_AUTH_TOKEN"] = auth_token;
   env["API_TIMEOUT_MS"] = "600000";
 
-  // Catch-all route goes to ANTHROPIC_MODEL
-  for (const route of config.routes) {
-    if (route.match === "*" || route.match === "**") {
-      env["ANTHROPIC_MODEL"] = modelIdWithSuffix(route.model ?? route.match, config);
-      break;
-    }
-  }
-
   // Tier-specific routes
   for (const tier of MODEL_TIERS) {
     for (const route of config.routes) {
