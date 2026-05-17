@@ -13,42 +13,73 @@ import { writeFileSync, mkdirSync } from "node:fs";
 const PID_DIR = join(homedir(), ".cc-router");
 const PID_FILE = join(PID_DIR, "cc-router.pid");
 
+const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal"] as const;
+type LogLevel = (typeof LOG_LEVELS)[number];
+
+function applyLogLevel(level: LogLevel | undefined, verbose?: boolean) {
+  const resolved = level ?? (verbose ? "debug" : undefined);
+  if (resolved) {
+    logger.level = resolved;
+  }
+  return resolved;
+}
+
 export function registerStartCommand(program: Command): void {
   program
     .command("start")
     .description("Start the CC-Router server")
     .option("-p, --port <port>", "Override the port from config")
     .option("-d, --daemon", "Run as a background daemon")
-    .option("--verbose", "Enable debug logging")
-    .action(async (opts: { port?: string; daemon?: boolean; verbose?: boolean }) => {
-      printBanner();
-      const config = loadConfig();
+    .option(
+      "--log-level <level>",
+      `Set log level (${LOG_LEVELS.join(", ")}). "trace" dumps full request payloads`,
+    )
+    .option("--verbose", 'Shorthand for --log-level debug')
+    .action(
+      async (opts: {
+        port?: string;
+        daemon?: boolean;
+        verbose?: boolean;
+        logLevel?: string;
+      }) => {
+        printBanner();
+        const config = loadConfig();
 
-      if (opts.port) {
-        config.server.port = parseInt(opts.port, 10);
-      }
+        if (opts.port) {
+          config.server.port = parseInt(opts.port, 10);
+        }
 
-      if (opts.verbose) {
-        logger.level = "debug";
-        config.log_level = "debug";
-      }
+        const level = opts.logLevel as LogLevel | undefined;
+        if (level && !LOG_LEVELS.includes(level)) {
+          console.error(
+            `Invalid log level: "${level}". Must be one of: ${LOG_LEVELS.join(", ")}`,
+          );
+          process.exit(1);
+        }
 
-      if (opts.daemon) {
-        startDaemon(config, opts);
-        return;
-      }
+        const resolved = applyLogLevel(level, opts.verbose);
 
-      const { host, port, auth_token } = config.server;
+        if (opts.daemon) {
+          startDaemon(config, opts);
+          return;
+        }
 
-      console.log(`CC-Router running on http://${host}:${port}\n`);
-      console.log("Add these to your shell:");
-      console.log(`export ANTHROPIC_BASE_URL="http://${host}:${port}"`);
-      console.log(`export ANTHROPIC_AUTH_TOKEN="${auth_token}"`);
-      printModelExports(config);
-      console.log();
+        const { host, port, auth_token } = config.server;
 
-      await startServer(config);
-    });
+        console.log(`CC-Router running on http://${host}:${port}`);
+        if (resolved) {
+          console.log(`Log level: ${resolved}`);
+        }
+        console.log();
+        console.log("Add these to your shell:");
+        console.log(`export ANTHROPIC_BASE_URL="http://${host}:${port}"`);
+        console.log(`export ANTHROPIC_AUTH_TOKEN="${auth_token}"`);
+        printModelExports(config);
+        console.log();
+
+        await startServer(config);
+      },
+    );
 }
 
 const MODEL_TIERS = [
@@ -72,10 +103,11 @@ function printModelExports(config: ReturnType<typeof loadConfig>): void {
 
 function startDaemon(
   config: ReturnType<typeof loadConfig>,
-  opts: { port?: string; verbose?: boolean },
+  opts: { port?: string; verbose?: boolean; logLevel?: string },
 ): void {
   const args: string[] = [];
   if (opts.port) args.push("-p", opts.port);
+  if (opts.logLevel) args.push("--log-level", opts.logLevel);
   if (opts.verbose) args.push("--verbose");
 
   const child = fork(

@@ -13,6 +13,7 @@ import { registerInjectCommand } from "./cli/commands/inject.js";
 import { registerModelsCommand } from "./cli/commands/models.js";
 import { loadConfig } from "./config/loader.js";
 import { startServer } from "./server/index.js";
+import { logger } from "./utils/logger.js";
 import { printBanner, VERSION } from "./utils/banner.js";
 
 const program = new Command();
@@ -42,14 +43,17 @@ program
   .command("_serve")
   .description("(Internal) Run the server directly")
   .option("-p, --port <port>", "Override port")
-  .option("--verbose", "Enable debug logging")
-  .action(async (opts: { port?: string; verbose?: boolean }) => {
+  .option("--log-level <level>", "Set log level")
+  .option("--verbose", "Shorthand for --log-level debug")
+  .action(async (opts: { port?: string; verbose?: boolean; logLevel?: string }) => {
     const config = loadConfig();
     if (opts.port) {
       config.server.port = parseInt(opts.port, 10);
     }
-    if (opts.verbose) {
-      config.log_level = "debug";
+    const level = opts.logLevel ?? (opts.verbose ? "debug" : undefined);
+    if (level) {
+      logger.level = level;
+      config.log_level = level;
     }
     await startServer(config);
   });

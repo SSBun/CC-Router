@@ -5,7 +5,8 @@ export function authMiddleware(authToken: string) {
     // Claude Code sends x-api-key, other clients send Authorization: Bearer
     const xApiKey = c.req.header("x-api-key");
     const bearer = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
-    const apiKey = xApiKey || bearer;
+    const queryKey = c.req.query("key");
+    const apiKey = xApiKey || bearer || queryKey;
 
     if (!apiKey || apiKey !== authToken) {
       return c.json(
