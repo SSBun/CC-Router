@@ -86,13 +86,13 @@ export ANTHROPIC_DEFAULT_SONNET_MODEL="deepseek-v4-pro"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="deepseek-v4-flash"
 ```
 
-Or auto-inject them into Claude Code's settings:
+Or configure Claude Code interactively:
 
 ```bash
-cc-router inject
+cc-router claude
 ```
 
-This writes the env vars into `~/.claude/settings.json` (with backup).
+This opens an interactive wizard that manages all of `~/.claude/settings.json` — cc-router env vars, feature flags, preferences, and more. Includes a token-efficient preset and j/k vim navigation. The legacy `inject` command is deprecated.
 
 Print exports manually anytime:
 
@@ -287,7 +287,8 @@ cc-router status                                          Show server status
 cc-router list                                            List providers and routes
 cc-router env                                             Print export statements
 cc-router setup                                           Interactive setup wizard
-cc-router inject                                          Inject env vars into Claude Code settings
+cc-router claude [--dry-run] [--no-backup]                Configure Claude Code settings
+cc-router dashboard                                       Open web dashboard in browser
 cc-router models [<id>]                                   Query built-in model database
 cc-router config show                                     Print current config
 cc-router config path                                     Print config file path
