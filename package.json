@@ -1,6 +1,6 @@
 {
   "name": "@ssbun/cc-router",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Multi-provider model router for Claude Code — route different models to different LLM providers",
   "type": "module",
   "main": "dist/index.js",

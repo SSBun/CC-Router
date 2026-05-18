@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.7.0] — 2026-05-18
+
+### Added
+- `cc-router claude` — interactive wizard to configure `~/.claude/settings.json`
+- Token-efficient preset that pre-fills all settings
+- Category-based menu: feature flags, preferences, attribution
+- j/k vim-style navigation in select/checkbox prompts
+- ESC to cancel or go back from any prompt
+- `cc-router dashboard` — opens the web dashboard in your browser
+- Settings manifest (`claude-settings-manifest.json`) with descriptions, types, presets
+
+### Fixed
+- Dashboard HTML path resolved to wrong directory (ENOENT at runtime)
+- Dashboard handler now returns 500 with message if HTML missing
+- `0.0.0.0`/`::` host remapped to `127.0.0.1` for browser URL
+- Proper connect timeout in dashboard port check
+
+### Changed
+- `inject` command hidden from help (deprecated in favor of `claude`)
+
 ## [0.6.0] — 2026-05-18
 
 ### Added
