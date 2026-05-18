@@ -1,4 +1,5 @@
-export const VERSION = "0.1.0";
+// @ts-ignore
+export const VERSION: string = __VERSION__;
 
 export function printBanner(): void {
   console.log(`

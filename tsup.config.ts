@@ -1,6 +1,8 @@
 import { defineConfig } from "tsup";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8"));
 
 export default defineConfig({
   entry: ["src/index.ts"],
@@ -12,6 +14,9 @@ export default defineConfig({
   sourcemap: true,
   banner: {
     js: '#!/usr/bin/env node',
+  },
+  define: {
+    __VERSION__: JSON.stringify(pkg.version),
   },
   async onSuccess() {
     const distDashboardDir = join(process.cwd(), "dist/dashboard");
