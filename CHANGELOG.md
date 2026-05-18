@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0] — 2026-05-18
+
+### Added
+- SQLite persistence for request history via `better-sqlite3` — records survive restarts
+- DB stored at `~/.cc-router/metrics.db` with WAL mode
+- On startup, recent records load back from SQLite into in-memory buffer
+- `GET /api/requests/history` — paginated access to full history beyond in-memory buffer
+- `DELETE /api/requests` — clear all stored records from SQLite
+- "Clear History" button in dashboard feed header with confirmation popover
+- Request detail lookup falls back to SQLite when not in memory
+
+### Changed
+- `MetricsCollector` now accepts optional `MetricsStore` for write-through persistence
+- Dashboard API routes receive store reference for history/clear endpoints
+
 ## [0.5.0] — 2026-05-14
 
 ### Added
