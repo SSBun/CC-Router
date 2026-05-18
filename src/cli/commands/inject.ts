@@ -7,7 +7,7 @@ import { loadConfig } from "../../config/loader.js";
 import { modelIdWithSuffix } from "../../model-info/resolver.js";
 import { logger } from "../../utils/logger.js";
 
-const SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
+export const SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
 
 const MODEL_TIERS = [
   { envVar: "ANTHROPIC_DEFAULT_OPUS_MODEL", probeModel: "claude-opus-4-20250514" },
@@ -15,7 +15,7 @@ const MODEL_TIERS = [
   { envVar: "ANTHROPIC_DEFAULT_HAIKU_MODEL", probeModel: "claude-haiku-4-20250514" },
 ] as const;
 
-function generateEnvVars(): Record<string, string> {
+export function generateEnvVars(): Record<string, string> {
   const config = loadConfig();
   const { host, port, auth_token } = config.server;
   const env: Record<string, string> = {};
@@ -38,7 +38,7 @@ function generateEnvVars(): Record<string, string> {
   return env;
 }
 
-function backupSettings(): string | null {
+export function backupSettings(): string | null {
   try {
     const backupDir = join(homedir(), ".cc-router", "backups");
     mkdirSync(backupDir, { recursive: true });
@@ -53,7 +53,7 @@ function backupSettings(): string | null {
 
 export function registerInjectCommand(program: Command): void {
   program
-    .command("inject")
+    .command("inject", { hidden: true })
     .description("Inject cc-router env vars into Claude Code settings.json")
     .option("--dry-run", "Print what would be written without modifying files")
     .option("--no-backup", "Skip creating a backup before modifying")

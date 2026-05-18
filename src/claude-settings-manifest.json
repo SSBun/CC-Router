@@ -1,0 +1,80 @@
+{
+  "_ccRouterEnv": [
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_AUTH_TOKEN",
+    "API_TIMEOUT_MS",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL"
+  ],
+  "_descriptions": {
+    "env.CLAUDE_CODE_ATTRIBUTION_HEADER": "Disables attribution headers in generated code",
+    "env.CLAUDE_CODE_DISABLE_1M_CONTEXT": "Disables 1M token long-context window to reduce latency/cost",
+    "env.CLAUDE_CODE_DISABLE_AUTO_MEMORY": "Prevents auto-storing and recalling info across sessions",
+    "env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "Disables telemetry, background updates, non-critical network requests",
+    "env.CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "Stops dynamic terminal window title updates",
+    "env.DISABLE_EXTRA_USAGE_COMMAND": "Disables usage tracking and statistics commands",
+    "env.CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT": "Uses concise system prompt instead of full detailed version",
+    "env.ENABLE_TOOL_SEARCH": "Controls tool search behavior",
+    "effortLevel": "AI reasoning effort — higher = better quality, slower response",
+    "editorMode": "Editor keybindings for Claude Code's built-in editing",
+    "feedbackSurveyRate": "Survey frequency (0 = disabled, 1 = always)",
+    "autoConnectIde": "Auto-connect to running IDE (VS Code, etc.)",
+    "autoMemoryEnabled": "Enable automatic memory storage across sessions",
+    "awaySummaryEnabled": "Summarize activity while terminal was inactive",
+    "showClearContextOnPlanAccept": "Prompt to clear context when accepting a plan",
+    "includeCoAuthoredBy": "Add Co-authored-by tag to git commits",
+    "includeGitInstructions": "Include git-related instructions in AI responses",
+    "attribution.commit": "Git commit attribution metadata",
+    "attribution.pr": "Git PR attribution metadata"
+  },
+  "_types": {
+    "env.CLAUDE_CODE_ATTRIBUTION_HEADER": "boolean",
+    "env.CLAUDE_CODE_DISABLE_1M_CONTEXT": "boolean",
+    "env.CLAUDE_CODE_DISABLE_AUTO_MEMORY": "boolean",
+    "env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "boolean",
+    "env.CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "boolean",
+    "env.DISABLE_EXTRA_USAGE_COMMAND": "boolean",
+    "env.CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT": "boolean",
+    "env.ENABLE_TOOL_SEARCH": "enum:auto,true,false",
+    "effortLevel": "enum:low,med,high,xhigh",
+    "editorMode": "enum:default,vim,emacs",
+    "feedbackSurveyRate": "number",
+    "autoConnectIde": "boolean",
+    "autoMemoryEnabled": "boolean",
+    "awaySummaryEnabled": "boolean",
+    "showClearContextOnPlanAccept": "boolean",
+    "includeCoAuthoredBy": "boolean",
+    "includeGitInstructions": "boolean",
+    "attribution.commit": "string",
+    "attribution.pr": "string"
+  },
+  "_presets": {
+    "token-efficient": {
+      "name": "Token Efficient",
+      "description": "Minimizes token usage — disables auto-memory, telemetry, long context, usage stats. Vim mode, xhigh effort.",
+      "values": {
+        "env": {
+          "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
+          "CLAUDE_CODE_DISABLE_1M_CONTEXT": "1",
+          "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+          "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "1",
+          "DISABLE_EXTRA_USAGE_COMMAND": "1",
+          "CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT": "1",
+          "ENABLE_TOOL_SEARCH": "auto"
+        },
+        "feedbackSurveyRate": 0,
+        "effortLevel": "xhigh",
+        "showClearContextOnPlanAccept": true,
+        "autoConnectIde": true,
+        "autoMemoryEnabled": false,
+        "awaySummaryEnabled": false,
+        "editorMode": "vim",
+        "attribution": { "commit": "", "pr": "" },
+        "includeCoAuthoredBy": false,
+        "includeGitInstructions": false
+      }
+    }
+  }
+}
