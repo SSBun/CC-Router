@@ -11,6 +11,7 @@ import { registerRestartCommand } from "./cli/commands/restart.js";
 import { registerRouteCommand } from "./cli/commands/route.js";
 import { registerInjectCommand } from "./cli/commands/inject.js";
 import { registerModelsCommand } from "./cli/commands/models.js";
+import { registerDashboardCommand } from "./cli/commands/dashboard.js";
 import { loadConfig } from "./config/loader.js";
 import { startServer } from "./server/index.js";
 import { logger } from "./utils/logger.js";
@@ -37,6 +38,7 @@ registerRestartCommand(program);
 registerRouteCommand(program);
 registerInjectCommand(program);
 registerModelsCommand(program);
+registerDashboardCommand(program);
 
 // Internal command for daemon mode (forked process runs the server directly)
 program

@@ -4,20 +4,30 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// src/server/routes/dashboard.ts → dist/server/routes/dashboard.ts
+// dashboard HTML is at dist/dashboard/index.html (sibling of dist/server/)
+const __rootDir = dirname(dirname(dirname(__filename)));
 
 let cachedHtml: string | null = null;
 
-function getDashboardHtml(): string {
+function getDashboardHtml(): string | null {
   if (!cachedHtml) {
-    const htmlPath = join(__dirname, "dashboard/index.html");
-    cachedHtml = readFileSync(htmlPath, "utf-8");
+    try {
+      const htmlPath = join(__rootDir, "dashboard/index.html");
+      cachedHtml = readFileSync(htmlPath, "utf-8");
+    } catch {
+      return null;
+    }
   }
   return cachedHtml;
 }
 
 export function createDashboardHandler() {
   return (c: Context) => {
-    return c.html(getDashboardHtml());
+    const html = getDashboardHtml();
+    if (!html) {
+      return c.text("Dashboard not found. Ensure cc-router is installed correctly.", 500);
+    }
+    return c.html(html);
   };
 }
