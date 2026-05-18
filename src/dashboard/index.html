@@ -45,6 +45,18 @@ nav { display: flex; align-items: center; justify-content: space-between; height
 .nav-btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
 .nav-btn:hover { background: var(--border); border-color: var(--muted); }
 .nav-btn:active { transform: scale(0.97); }
+.nav-btn.danger { border-color: rgba(248,81,73,0.4); color: var(--red); }
+.nav-btn.danger:hover { background: rgba(248,81,73,0.15); border-color: var(--red); }
+.feed-btn { padding: 4px 12px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; transition: all 0.15s ease; }
+.feed-btn:hover { color: var(--text); background: var(--border); }
+.feed-btn.danger { border-color: rgba(248,81,73,0.3); color: var(--red); }
+.feed-btn.danger:hover { background: rgba(248,81,73,0.12); border-color: var(--red); }
+.confirm-popover { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--bg-card); border: 1px solid var(--red); border-radius: 8px; padding: 12px 14px; z-index: 50; min-width: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.confirm-popover p { font-size: 12px; color: var(--text); margin-bottom: 10px; }
+.confirm-popover .confirm-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm-popover .confirm-btns button { padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border); }
+.confirm-popover .btn-cancel { background: transparent; color: var(--muted); }
+.confirm-popover .btn-confirm-delete { background: var(--red); color: #fff; border-color: var(--red); }
 
 /* Stats */
 .stats-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 16px 20px; flex-shrink: 0; }
@@ -285,6 +297,9 @@ nav { display: flex; align-items: center; justify-content: space-between; height
         <span class="feed-title">Live Request Stream</span>
         <div class="feed-controls">
           <label class="autoscroll-toggle"><input type="checkbox" id="autoScroll" checked><span>Auto-scroll</span></label>
+          <div style="position:relative;display:inline-block">
+            <button class="feed-btn danger" id="btnClear">Clear History</button>
+          </div>
         </div>
       </div>
       <div class="feed-list" id="feedList">
@@ -1020,6 +1035,29 @@ nav { display: flex; align-items: center; justify-content: space-between; height
 
   // --- Init ---
   initAuth();
+
+  // --- Clear History ---
+  var clearPopover = null;
+  document.getElementById('btnClear').addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (clearPopover) { clearPopover.remove(); clearPopover = null; return; }
+    var pop = document.createElement('div'); pop.className = 'confirm-popover';
+    pop.innerHTML = '<p>Delete all request history from the database?</p><div class="confirm-btns"><button class="btn-cancel">Cancel</button><button class="btn-confirm-delete">Delete All</button></div>';
+    this.parentElement.appendChild(pop);
+    clearPopover = pop;
+    pop.querySelector('.btn-cancel').addEventListener('click', function() { pop.remove(); clearPopover = null; });
+    pop.querySelector('.btn-confirm-delete').addEventListener('click', function() {
+      pop.querySelector('.btn-confirm-delete').textContent = 'Deleting...';
+      fetch('/api/requests', { method: 'DELETE', headers: authH() }).then(function(r) { return r.json(); }).then(function(d) {
+        pop.remove(); clearPopover = null;
+        var list = document.getElementById('feedList'); list.textContent = '';
+        list.appendChild(Object.assign(document.createElement('div'), { className: 'feed-empty', id: 'feedEmpty', textContent: 'Waiting for requests...' }));
+        lastFeedTime = 0;
+        loadStats();
+      }).catch(function() { pop.remove(); clearPopover = null; });
+    });
+  });
+  document.addEventListener('click', function() { if (clearPopover) { clearPopover.remove(); clearPopover = null; } });
 })();
 </script>
 </body>

@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { AppConfig } from "../../config/schema.js";
 import type { MetricsCollector, RequestRecord } from "../middleware/metrics.js";
+import type { MetricsStore } from "../middleware/metrics-store.js";
 import modelDb from "../../data/model-db.json" with { type: "json" };
 
 // ---------------------------------------------------------------------------
@@ -23,6 +24,7 @@ export function createApiRoutes(
   config: AppConfig,
   metrics: MetricsCollector,
   isTrace: boolean,
+  store: MetricsStore,
 ) {
   return {
     stats(c: Context) {
@@ -48,6 +50,14 @@ export function createApiRoutes(
         return c.json({ error: "Not found" }, 404);
       }
       return c.json(record);
+    },
+
+    history(c: Context) {
+      const limit = Number(c.req.query("limit")) || 100;
+      const offset = Number(c.req.query("offset")) || 0;
+      const total = store.getHistoryCount();
+      const data = store.getHistory(limit, offset);
+      return c.json({ limit, offset, total, data });
     },
 
     events(c: Context) {
@@ -126,6 +136,17 @@ export function createApiRoutes(
 
     models(c: Context) {
       return c.json(modelDb);
+    },
+
+    clearRecords(c: Context) {
+      const before = c.req.query("before");
+      let count: number;
+      if (before) {
+        count = store.prune(Number(before) * 1000);
+      } else {
+        count = store.clearAll();
+      }
+      return c.json({ deleted: count });
     },
   };
 }

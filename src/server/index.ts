@@ -6,6 +6,7 @@ import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { MetricsCollector } from "./middleware/metrics.js";
+import { MetricsStore } from "./middleware/metrics-store.js";
 import { createDashboardHandler } from "./routes/dashboard.js";
 import { createApiRoutes } from "./routes/api.js";
 import { createMessagesHandler } from "./routes/messages.js";
@@ -16,8 +17,10 @@ export function createApp(config: AppConfig): Hono {
   const app = new Hono();
 
   const isTrace = logger.level === "trace";
-  const metrics = new MetricsCollector(isTrace);
-  const api = createApiRoutes(config, metrics, isTrace);
+  const store = new MetricsStore();
+  const metrics = new MetricsCollector(isTrace, store);
+  metrics.loadFromStore();
+  const api = createApiRoutes(config, metrics, isTrace, store);
 
   app.use("*", cors());
   app.onError(errorHandler);
@@ -35,10 +38,12 @@ export function createApp(config: AppConfig): Hono {
   // Dashboard API
   app.get("/api/stats", api.stats);
   app.get("/api/requests", api.requests);
+  app.get("/api/requests/history", api.history);
   app.get("/api/requests/:id", api.requestById);
   app.get("/api/events", api.events);
   app.get("/api/config", api.config);
   app.get("/api/models", api.models);
+  app.delete("/api/requests", api.clearRecords);
 
   return app;
 }
@@ -56,6 +61,7 @@ export function startServer(config: AppConfig): Promise<void> {
 
     const shutdown = () => {
       logger.info("Shutting down...");
+      store.close();
       server.close(() => {
         logger.info("Server stopped");
         process.exit(0);

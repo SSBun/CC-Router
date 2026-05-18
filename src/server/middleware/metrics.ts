@@ -4,6 +4,7 @@ import type {
   AnthropicMessagesRequest,
   AnthropicMessagesResponse,
 } from "../../providers/types.js";
+import type { MetricsStore } from "./metrics-store.js";
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -58,9 +59,17 @@ export class MetricsCollector {
   private readonly maxSize: number;
   private readonly startTime: number = Date.now();
   private listeners: RecordListener[] = [];
+  private store?: MetricsStore;
 
-  constructor(isTrace: boolean) {
+  constructor(isTrace: boolean, store?: MetricsStore) {
     this.maxSize = isTrace ? 500 : 1000;
+    this.store = store;
+  }
+
+  loadFromStore(): void {
+    if (!this.store) return;
+    this.requests = this.store.loadRecent(this.maxSize);
+    logger.info({ count: this.requests.length }, "Loaded records from SQLite");
   }
 
   // -----------------------------------------------------------------------
@@ -130,6 +139,9 @@ export class MetricsCollector {
     if (this.requests.length > this.maxSize) {
       this.requests.shift();
     }
+
+    // Persist to SQLite
+    this.store?.insert(rec);
 
     // Notify subscribers (fire-and-forget)
     for (const listener of this.listeners) {
@@ -207,7 +219,9 @@ export class MetricsCollector {
   }
 
   getRequestById(id: string): RequestRecord | undefined {
-    return this.requests.find((r) => r.id === id);
+    const inMemory = this.requests.find((r) => r.id === id);
+    if (inMemory) return inMemory;
+    return this.store?.getById(id);
   }
 
   onRecord(listener: RecordListener): () => void {
