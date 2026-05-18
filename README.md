@@ -108,6 +108,38 @@ claude
 
 Claude Code now routes through CC-Router. Opus requests go to Anthropic, Sonnet requests go to OpenAI, Haiku requests go to DeepSeek — all transparent.
 
+## Dashboard
+
+CC-Router includes a built-in web dashboard for monitoring requests in real time. Open it at:
+
+```
+http://127.0.0.1:8787/dashboard
+```
+
+### Features
+
+- **Live request stream** — real-time feed of all proxied requests via SSE
+- **Request details** — click any request to inspect full request/response payloads
+- **Structured view** — toggle between raw JSON and parsed chat timeline (messages, tool calls, thinking blocks)
+- **Markdown preview** — render message content as markdown
+- **Usage stats** — request count, token usage, error rate, latency percentiles
+- **Provider & route info** — sidebar with provider status, active routes, top models
+- **Config & models viewer** — inspect your routing config and built-in model database
+
+### Persistent History
+
+Request records are stored in SQLite at `~/.cc-router/metrics.db`. History survives server restarts. Use the "Clear History" button in the dashboard to wipe stored data.
+
+### Trace Mode
+
+For full request/response payload capture:
+
+```bash
+cc-router start --log-level trace
+```
+
+Trace mode stores complete request and response bodies, enabling detailed inspection of messages, tools, and thinking blocks in the dashboard.
+
 ## Configuration
 
 Config lives at `~/.cc-router/config.yaml`. Edit it directly or use the CLI:
@@ -248,24 +280,33 @@ providers:
 ## CLI Reference
 
 ```
-cc-router start [-p <port>] [-d] [--verbose]   Start the server
-cc-router stop                                   Stop the daemon
-cc-router restart [-p <port>] [--verbose]        Restart the daemon
-cc-router status                                 Show server status
-cc-router list                                   List providers and routes
-cc-router env                                    Print export statements
-cc-router setup                                  Interactive setup wizard
-cc-router inject                                 Inject env vars into Claude Code settings
-cc-router models [<id>]                          Query built-in model database
-cc-router config show                            Print current config
-cc-router config path                            Print config file path
-cc-router config edit                            Open config in $EDITOR
-cc-router route list                             List routes
-cc-router route add                              Add a new route
-cc-router route edit                             Edit an existing route
-cc-router route remove                           Remove a route
-cc-router route reorder                          Change route priority
-cc-router chat [-m <model>] [--no-stream]        Test chat with a provider
+cc-router start [-p <port>] [-d] [--log-level <level>]   Start the server
+cc-router stop                                            Stop the daemon
+cc-router restart [-p <port>]                             Restart the daemon
+cc-router status                                          Show server status
+cc-router list                                            List providers and routes
+cc-router env                                             Print export statements
+cc-router setup                                           Interactive setup wizard
+cc-router inject                                          Inject env vars into Claude Code settings
+cc-router models [<id>]                                   Query built-in model database
+cc-router config show                                     Print current config
+cc-router config path                                     Print config file path
+cc-router config edit                                     Open config in $EDITOR
+cc-router route list                                      List routes
+cc-router route add                                       Add a new route
+cc-router route edit                                      Edit an existing route
+cc-router route remove                                    Remove a route
+cc-router route reorder                                   Change route priority
+cc-router chat [-m <model>] [--no-stream]                 Test chat with a provider
+```
+
+### Log Levels
+
+```bash
+cc-router start --log-level trace    # full request/response payloads
+cc-router start --log-level debug    # request summaries
+cc-router start --log-level info     # default
+cc-router start --verbose            # shorthand for --log-level debug
 ```
 
 ### Route Management
@@ -329,20 +370,8 @@ Claude Code then sends requests with model `gpt-4o`. CC-Router matches `*sonnet*
 - Request authentication via auth token
 - Daemon mode with PID management
 - Environment variable interpolation in config
-
-## Logging
-
-Set log level in config:
-
-```yaml
-log_level: "debug"   # trace | debug | info | warn | error | fatal
-```
-
-Or use `--verbose` when starting:
-
-```bash
-cc-router start --verbose
-```
+- Built-in web dashboard with real-time monitoring
+- SQLite-backed request history persistence
 
 ## License
 
