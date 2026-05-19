@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.1] — 2026-05-19
+
+### Fixed
+- Dashboard HTML path resolution broken by tsup bundling — used 3x `dirname()` assuming
+  file layout `dist/server/routes/dashboard.js`, but tsup bundles into single `dist/index.js`
+
 ## [0.7.0] — 2026-05-18
 
 ### Added
