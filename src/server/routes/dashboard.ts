@@ -4,16 +4,15 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
-// src/server/routes/dashboard.ts → dist/server/routes/dashboard.ts
-// dashboard HTML is at dist/dashboard/index.html (sibling of dist/server/)
-const __rootDir = dirname(dirname(dirname(__filename)));
+// tsup bundles into dist/index.js, dashboard HTML is at dist/dashboard/index.html
+const __distDir = dirname(__filename);
 
 let cachedHtml: string | null = null;
 
 function getDashboardHtml(): string | null {
   if (!cachedHtml) {
     try {
-      const htmlPath = join(__rootDir, "dashboard/index.html");
+      const htmlPath = join(__distDir, "dashboard/index.html");
       cachedHtml = readFileSync(htmlPath, "utf-8");
     } catch {
       return null;
