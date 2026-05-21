@@ -7,7 +7,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { MetricsCollector } from "./middleware/metrics.js";
 import { MetricsStore } from "./middleware/metrics-store.js";
-import { createDashboardHandler } from "./routes/dashboard.js";
+import { createDashboardHandler, createSessionHandler } from "./routes/dashboard.js";
 import { createApiRoutes } from "./routes/api.js";
 import { createMessagesHandler } from "./routes/messages.js";
 import { createModelsHandler } from "./routes/models.js";
@@ -27,6 +27,7 @@ export function createApp(config: AppConfig): Hono {
 
   // Dashboard HTML — no auth (browser navigates without headers)
   app.get("/dashboard", createDashboardHandler());
+  app.get("/dashboard/session", createSessionHandler());
 
   // Auth-protected routes
   app.use("*", authMiddleware(config.server.auth_token));

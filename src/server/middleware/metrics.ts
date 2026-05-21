@@ -72,6 +72,10 @@ export class MetricsCollector {
     logger.info({ count: this.requests.length }, "Loaded records from SQLite");
   }
 
+  clear(): void {
+    this.requests = [];
+  }
+
   // -----------------------------------------------------------------------
   // Public API
   // -----------------------------------------------------------------------

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Analytics — cc-router</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --muted: #8b949e;
+  --blue: #58a6ff;
+  --green: #3fb950;
+  --orange: #f0883e;
+  --red: #f85149;
+  --purple: #a371f7;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  --radius: 8px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+.page { max-width: 960px; margin: 0 auto; padding: 32px 24px 100px; }
+.page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.page-title { font-size: 18px; font-weight: 700; }
+.page-title .accent { color: var(--blue); }
+.back-btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); font-size: 13px; cursor: pointer; text-decoration: none; transition: all 0.15s ease; }
+.back-btn:hover { background: var(--border); }
+
+.loading { display: flex; align-items: center; justify-content: center; min-height: 60vh; color: var(--muted); font-size: 15px; }
+.error-msg { color: var(--red); }
+
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 28px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; }
+.detail-field { display: flex; flex-direction: column; gap: 2px; }
+.detail-field-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.detail-field-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+.detail-field-value.ok { color: var(--green); }
+.detail-field-value.err { color: var(--red); }
+.detail-field-value.yes { color: var(--orange); }
+
+.struct-section { margin-bottom: 4px; }
+.struct-section-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
+.struct-section-title:hover { color: var(--text); }
+.struct-section-title::before { content: '\25BC'; font-size: 9px; transition: transform 0.15s; display: inline-block; }
+.struct-section-title.collapsed::before { transform: rotate(-90deg); }
+.struct-section-body { padding: 8px 0; overflow: hidden; transition: max-height 0.2s ease; }
+.struct-section-body.collapsed { max-height: 0 !important; padding: 0; overflow: hidden; }
+
+.section-l1 > .struct-section-title { font-size: 13px; color: var(--text); padding: 14px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; letter-spacing: 0.8px; font-weight: 700; }
+.section-l1 { margin-bottom: 12px; }
+
+.msg-item { margin-bottom: 2px; }
+.msg-item-header { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; user-select: none; }
+.msg-item-header:hover { opacity: 0.85; }
+.msg-item-toggle { color: var(--muted); font-size: 9px; transition: transform 0.15s; display: inline-block; }
+.msg-item-toggle.collapsed { transform: rotate(-90deg); }
+.msg-item-num { font-family: var(--font-mono); font-size: 10px; color: var(--muted); font-weight: 600; min-width: 20px; }
+.msg-item-role { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 4px; }
+.msg-item-role.user { color: var(--blue); background: rgba(88,166,255,0.1); }
+.msg-item-role.assistant { color: var(--purple); background: rgba(163,113,247,0.1); }
+.msg-item-body { padding: 4px 0 8px 20px; overflow: hidden; transition: max-height 0.2s ease; }
+.msg-item-body.collapsed { max-height: 0 !important; padding: 0 0 0 20px; overflow: hidden; }
+
+.system-block { background: rgba(63,185,80,0.06); border: 1px solid rgba(63,185,80,0.15); border-radius: 6px; padding: 12px 16px; }
+.system-label { color: var(--green); font-size: 10px; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; }
+.system-text { color: var(--text); font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow-y: auto; }
+
+.msg-timeline { display: flex; flex-direction: column; gap: 8px; }
+.msg-bubble { border-radius: 8px; padding: 10px 14px; max-width: 95%; }
+.msg-bubble.user { background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.2); }
+.msg-bubble.assistant { background: rgba(163,113,247,0.08); border: 1px solid rgba(163,113,247,0.15); }
+.msg-text { color: var(--text); white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.7; }
+.msg-text:empty { display: none; }
+
+.content-block { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; margin-top: 6px; }
+.cb-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.cb-type { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 3px; background: rgba(88,166,255,0.15); color: var(--blue); }
+.cb-type.tool_use { background: rgba(240,136,62,0.15); color: var(--orange); }
+.cb-type.tool_result { background: rgba(63,185,80,0.15); color: var(--green); }
+.cb-type.thinking { background: rgba(163,113,247,0.15); color: var(--purple); }
+.cb-type.image { background: rgba(248,81,73,0.15); color: var(--red); }
+.cb-meta { font-size: 10px; color: var(--muted); font-family: var(--font-mono); }
+.cb-body { margin-top: 4px; }
+
+.tool-def-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; }
+.tool-def-name { color: var(--blue); font-weight: 600; font-size: 12px; }
+.tool-def-desc { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.tool-def-schema { color: var(--muted); font-size: 10px; white-space: pre-wrap; max-height: 120px; overflow-y: auto; margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; }
+
+.fab { position: fixed; bottom: 24px; right: 24px; width: 48px; height: 48px; border-radius: 50%; border: none; background: var(--blue); color: #fff; font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; z-index: 50; }
+.fab:hover { transform: scale(1.08); opacity: 0.9; }
+.fab-label { position: fixed; bottom: 30px; right: 80px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 12px; color: var(--muted); pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+.fab:hover ~ .fab-label { opacity: 1; }
+
+.struct-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; background: var(--bg); border-radius: 6px; padding: 10px 14px; font-size: 11px; }
+.struct-meta-key { color: var(--muted); }
+.struct-meta-val { color: var(--text); font-family: var(--font-mono); }
+
+@media (max-width: 768px) {
+  .page { padding: 16px 12px 100px; }
+  .detail-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.md-preview { font-size: 13px; line-height: 1.7; color: var(--text); }
+.md-preview h1 { font-size: 18px; font-weight: 700; margin: 12px 0 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.md-preview h2 { font-size: 16px; font-weight: 700; margin: 10px 0 4px; }
+.md-preview h3 { font-size: 14px; font-weight: 600; margin: 8px 0 4px; }
+.md-preview h4 { font-size: 13px; font-weight: 600; margin: 6px 0 2px; }
+.md-preview p { margin: 4px 0; }
+.md-preview strong { font-weight: 700; }
+.md-preview em { font-style: italic; color: var(--blue); }
+.md-preview code { background: var(--bg-card); padding: 2px 5px; border-radius: 3px; font-family: var(--font-mono); font-size: 12px; color: var(--orange); }
+.md-preview pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; overflow-x: auto; margin: 6px 0; }
+.md-preview pre code { background: none; padding: 0; }
+.md-preview ul, .md-preview ol { margin: 4px 0; padding-left: 20px; }
+.md-preview li { margin: 2px 0; }
+.md-preview blockquote { border-left: 3px solid var(--blue); padding: 4px 12px; margin: 6px 0; color: var(--muted); background: rgba(88,166,255,0.04); border-radius: 0 4px 4px 0; }
+.md-preview hr { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+.md-preview table { border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+.md-preview th, .md-preview td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
+.md-preview th { background: var(--bg-card); font-weight: 600; }
+</style>
+<style>pre code.hljs{display:block;overflow-x:auto;padding:1em}code.hljs{padding:3px 5px}.hljs{color:#c9d1d9;background:#0d1117}.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.language_{color:#ff7b72}.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#d2a8ff}.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#79c0ff}.hljs-meta .hljs-string,.hljs-regexp,.hljs-string{color:#a5d6ff}.hljs-built_in,.hljs-symbol{color:#ffa657}.hljs-code,.hljs-comment,.hljs-formula{color:#8b949e}.hljs-name,.hljs-quote,.hljs-selector-pseudo,.hljs-selector-tag{color:#7ee787}.hljs-subst{color:#c9d1d9}.hljs-section{color:#1f6feb;font-weight:700}.hljs-bullet{color:#f2cc60}.hljs-emphasis{color:#c9d1d9;font-style:italic}.hljs-strong{color:#c9d1d9;font-weight:700}.hljs-addition{color:#aff5b4;background-color:#033a16}.hljs-deletion{color:#ffdcd7;background-color:#67060c}</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <a href="/dashboard" class="back-btn">&larr; Dashboard</a>
+    <div class="page-title"><span class="accent">Session</span> Analytics</div>
+  </div>
+  <div id="loadingArea" class="loading">Loading session data...</div>
+  <div id="pageContent"></div>
+</div>
+<button id="exportFab" class="fab" style="display:none" title="Export as HTML">&#x2913;</button>
+<span class="fab-label">Export HTML</span>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/xml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/yaml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/css.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/sql.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/diff.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/plaintext.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  function authH() { var k = localStorage.getItem('cc-router-key'); return k ? { 'x-api-key': k } : {}; }
+  function apiGet(p) { return fetch(p, { headers: authH() }); }
+
+  function fmtTok(n) {
+    if (n >= 1e9) return (n/1e9).toFixed(1)+'B';
+    if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+    if (n >= 1e3) return (n/1e3).toFixed(n>=1e4?0:1)+'K';
+    return String(n);
+  }
+  function fmtLat(ms) {
+    if (ms >= 60000) return (ms/60000).toFixed(1)+'m';
+    if (ms >= 1000) return (ms/1000).toFixed(1)+'s';
+    return Math.round(ms)+'ms';
+  }
+  function fmtTime(ts) {
+    var d = new Date(ts);
+    return d.toLocaleDateString() + ' ' + d.toTimeString().slice(0,8);
+  }
+
+  function mkVal(t, c) { var v = document.createElement('span'); v.className = 'detail-field-value' + (c ? ' ' + c : ''); v.textContent = t; return v; }
+  function df(l, v) {
+    var f = document.createElement('div'); f.className = 'detail-field';
+    f.appendChild(Object.assign(document.createElement('span'), { className: 'detail-field-label', textContent: l }));
+    if (typeof v === 'string') { f.appendChild(Object.assign(document.createElement('span'), { className: 'detail-field-value', textContent: v })); }
+    else { var w = document.createElement('span'); w.className = 'detail-field-value'; w.appendChild(v); f.appendChild(w); }
+    return f;
+  }
+
+  function mkCollapsible(title, parent, level) {
+    var sec = document.createElement('div'); sec.className = 'struct-section' + (level ? ' section-' + level : '');
+    var hdr = document.createElement('div'); hdr.className = 'struct-section-title'; hdr.textContent = title;
+    var body = document.createElement('div'); body.className = 'struct-section-body';
+    hdr.addEventListener('click', function() { hdr.classList.toggle('collapsed'); body.classList.toggle('collapsed'); });
+    sec.appendChild(hdr); sec.appendChild(body);
+    if (parent) parent.appendChild(sec);
+    return body;
+  }
+
+  function mkMsgItem(role, idx, parent) {
+    var item = document.createElement('div'); item.className = 'msg-item';
+    var header = document.createElement('div'); header.className = 'msg-item-header';
+    var toggle = document.createElement('span'); toggle.className = 'msg-item-toggle'; toggle.textContent = '▼';
+    var num = document.createElement('span'); num.className = 'msg-item-num'; num.textContent = '#' + idx;
+    var roleTag = document.createElement('span'); roleTag.className = 'msg-item-role ' + role; roleTag.textContent = role;
+    header.appendChild(toggle); header.appendChild(num); header.appendChild(roleTag);
+    item.appendChild(header);
+    var body = document.createElement('div'); body.className = 'msg-item-body';
+    header.addEventListener('click', function() { toggle.classList.toggle('collapsed'); body.classList.toggle('collapsed'); });
+    item.appendChild(body);
+    if (parent) parent.appendChild(item);
+    return body;
+  }
+
+  function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function setMd(el, text) {
+    if (!text) return;
+    try {
+      var div = document.createElement('div'); div.className = 'md-preview';
+      var raw = marked.parse(text);
+      var parser = new DOMParser();
+      var doc = parser.parseFromString('<body><div>' + raw + '</div></body>', 'text/html');
+      var src = doc.body.firstChild;
+      while (src.firstChild) div.appendChild(src.firstChild);
+      el.appendChild(div);
+      div.querySelectorAll('pre code').forEach(function(block) {
+        try { hljs.highlightElement(block); } catch(e) {}
+      });
+    } catch(e) {
+      el.appendChild(Object.assign(document.createElement('pre'), { textContent: text }));
+    }
+  }
+
+  function renderContentBlock(block, parent) {
+    var cell = parent.appendChild(document.createElement('div')); cell.className = 'content-block';
+    var hdr = cell.appendChild(document.createElement('div')); hdr.className = 'cb-header';
+    var typeTag = hdr.appendChild(document.createElement('span')); typeTag.className = 'cb-type ' + block.type; typeTag.textContent = block.type;
+    var metaParts = [];
+    if (block.cache_control) metaParts.push('cache:' + block.cache_control.type);
+    if (block.type === 'tool_use') metaParts.push(block.name);
+    if (block.type === 'tool_result') metaParts.push('id:' + block.tool_use_id);
+    if (metaParts.length) hdr.appendChild(Object.assign(document.createElement('span'), { className: 'cb-meta', textContent: metaParts.join(' \xB7 ') }));
+    var body = cell.appendChild(document.createElement('div')); body.className = 'cb-body';
+
+    if (block.type === 'text') {
+      setMd(body, block.text);
+    } else if (block.type === 'tool_use') {
+      if (block.input && Object.keys(block.input).length) {
+        var inp = mkCollapsible('input (' + Object.keys(block.input).length + ' keys)', body);
+        inp.appendChild(Object.assign(document.createElement('div'), { className: 'tool-def-schema', textContent: JSON.stringify(block.input, null, 2) }));
+      }
+    } else if (block.type === 'tool_result') {
+      if (block.is_error) body.appendChild(Object.assign(document.createElement('div'), { style: 'color:var(--red);font-size:11px', textContent: '[error]' }));
+      if (typeof block.content === 'string') {
+        setMd(body, block.content);
+      } else if (Array.isArray(block.content)) {
+        for (var j = 0; j < block.content.length; j++) renderContentBlock(block.content[j], body);
+      }
+    } else if (block.type === 'thinking') {
+      setMd(body, block.thinking);
+    } else if (block.type === 'image') {
+      body.appendChild(Object.assign(document.createElement('div'), { className: 'image-indicator', textContent: block.source.media_type + ', ' + Math.round(block.source.data.length * 0.75 / 1024) + 'KB' }));
+    } else {
+      body.appendChild(Object.assign(document.createElement('div'), { className: 'msg-text', textContent: JSON.stringify(block, null, 2) }));
+    }
+  }
+
+  function renderSession(r) {
+    var page = document.getElementById('pageContent');
+    document.getElementById('loadingArea').remove();
+
+    var grid = document.createElement('div'); grid.className = 'detail-grid';
+    grid.appendChild(df('Model', mkVal(r.model)));
+    grid.appendChild(df('Provider', mkVal(r.provider)));
+    grid.appendChild(df('Resolved Model', mkVal(r.resolvedModel)));
+    var sv = mkVal(r.stream ? 'Yes' : 'No'); if (r.stream) sv.classList.add('yes');
+    grid.appendChild(df('Stream', sv));
+    grid.appendChild(df('Latency', mkVal(fmtLat(r.latencyMs))));
+    grid.appendChild(df('Timestamp', mkVal(fmtTime(r.timestamp))));
+    grid.appendChild(df('Input Tokens', mkVal(fmtTok(r.inputTokens))));
+    grid.appendChild(df('Output Tokens', mkVal(fmtTok(r.outputTokens))));
+    grid.appendChild(df('Cache Creation', mkVal(fmtTok(r.cacheCreationTokens))));
+    grid.appendChild(df('Cache Read', mkVal(fmtTok(r.cacheReadTokens))));
+    grid.appendChild(df('Tool Count', mkVal(String(r.toolCount))));
+    grid.appendChild(df('Message Count', mkVal(String(r.messageCount))));
+    var hv = mkVal(r.hasThinking ? 'Yes' : 'No'); if (r.hasThinking) hv.classList.add('yes');
+    grid.appendChild(df('Has Thinking', hv));
+    grid.appendChild(df('Thinking Budget', mkVal(r.thinkingBudget ? fmtTok(r.thinkingBudget) : '--')));
+    grid.appendChild(df('System Length', mkVal(r.systemLength ? r.systemLength.toLocaleString() + ' chars' : '--')));
+    var stv = mkVal(r.status === 'success' ? 'Success' : 'Error'); stv.classList.add(r.status === 'success' ? 'ok' : 'err');
+    grid.appendChild(df('Status', stv));
+    var ev = mkVal(r.errorMessage || '--'); if (r.errorMessage) ev.classList.add('err');
+    grid.appendChild(df('Error', ev));
+    page.appendChild(grid);
+
+    if (!r.fullRequest) {
+      page.appendChild(Object.assign(document.createElement('p'), { style: 'color:var(--muted);margin-top:24px', textContent: 'No full request data available (trace mode was off).' }));
+      return;
+    }
+
+    var fr = r.fullRequest;
+    var container = document.createElement('div'); container.id = 'sessionContent';
+    page.appendChild(container);
+
+    var metaBody = mkCollapsible('Request Config', container, 'l1');
+    var mg = metaBody.appendChild(document.createElement('div')); mg.className = 'struct-meta';
+    var fields = [['model', fr.model], ['max_tokens', fr.max_tokens], ['stream', fr.stream], ['temperature', fr.temperature], ['top_p', fr.top_p], ['top_k', fr.top_k]];
+    if (fr.thinking) fields.push(['thinking_budget', fr.thinking.budget_tokens]);
+    if (fr.tool_choice) fields.push(['tool_choice', fr.tool_choice.type === 'tool' ? 'tool:' + fr.tool_choice.name : fr.tool_choice.type]);
+    if (fr.stop_sequences) fields.push(['stop_sequences', fr.stop_sequences.join(', ')]);
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i][1] === undefined) continue;
+      mg.appendChild(Object.assign(document.createElement('span'), { className: 'struct-meta-key', textContent: fields[i][0] }));
+      mg.appendChild(Object.assign(document.createElement('span'), { className: 'struct-meta-val', textContent: String(fields[i][1]) }));
+    }
+
+    if (fr.system) {
+      var sysBody = mkCollapsible('System Prompt', container, 'l1');
+      var sb = sysBody.appendChild(document.createElement('div')); sb.className = 'system-block';
+      var stxt = typeof fr.system === 'string' ? fr.system : fr.system.map(function(b) { return b.text; }).join('\n');
+      var sysDiv = document.createElement('div'); sysDiv.className = 'system-text'; setMd(sysDiv, stxt);
+      sb.appendChild(Object.assign(document.createElement('div'), { className: 'system-label', textContent: 'SYSTEM' }));
+      sb.appendChild(sysDiv);
+    }
+
+    if (fr.messages && fr.messages.length) {
+      var msgsBody = mkCollapsible('Messages (' + fr.messages.length + ')', container, 'l1');
+      var tl = msgsBody.appendChild(document.createElement('div')); tl.className = 'msg-timeline';
+      for (var mi = 0; mi < fr.messages.length; mi++) {
+        try {
+        var msg = fr.messages[mi];
+        var item = mkMsgItem(msg.role, mi + 1, tl);
+        var bubble = item.appendChild(document.createElement('div')); bubble.className = 'msg-bubble ' + msg.role;
+        if (typeof msg.content === 'string') {
+          setMd(bubble, msg.content);
+        } else if (Array.isArray(msg.content)) {
+          for (var ci = 0; ci < msg.content.length; ci++) {
+            try { renderContentBlock(msg.content[ci], bubble); } catch(e) { bubble.appendChild(Object.assign(document.createElement('div'), { style: 'color:var(--red);font-size:11px', textContent: '[render error: ' + e.message + ']' })); }
+          }
+        }
+        } catch(e) { var errMsg = document.createElement('div'); errMsg.className = 'msg-item'; errMsg.style.color = 'var(--red)'; errMsg.style.fontSize = '12px'; errMsg.textContent = 'Message #' + (mi+1) + ' render error: ' + e.message; tl.appendChild(errMsg); }
+      }
+    }
+
+    if (fr.tools && fr.tools.length) {
+      var toolsBody = mkCollapsible('Tool Definitions (' + fr.tools.length + ')', container, 'l1');
+      for (var ti = 0; ti < fr.tools.length; ti++) {
+        var tool = fr.tools[ti];
+        var tdc = toolsBody.appendChild(document.createElement('div')); tdc.className = 'tool-def-card'; tdc.style.marginBottom = '8px';
+        tdc.appendChild(Object.assign(document.createElement('div'), { className: 'tool-def-name', textContent: tool.name }));
+        if (tool.description) tdc.appendChild(Object.assign(document.createElement('div'), { className: 'tool-def-desc', textContent: tool.description }));
+        if (tool.input_schema) {
+          var schemaBody = mkCollapsible('schema', tdc);
+          schemaBody.appendChild(Object.assign(document.createElement('div'), { className: 'tool-def-schema', textContent: JSON.stringify(tool.input_schema, null, 2) }));
+        }
+      }
+    }
+
+    document.getElementById('exportFab').style.display = 'flex';
+    window.__sessionData = r;
+  }
+
+  function exportAsHtml() {
+    var r = window.__sessionData;
+    if (!r || !r.fullRequest) return;
+    var fr = r.fullRequest;
+    var p = [];
+    p.push('<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">');
+    p.push('<title>Session Report — ' + escH(fr.model) + '</title>');
+    p.push('<style>');
+    p.push(':root{--bg:#fff;--bg-card:#f6f8fa;--border:#d0d7de;--text:#1f2328;--muted:#656d76;--blue:#0969da;--green:#1a7f37;--orange:#bc4c00;--red:#cf222e;--purple:#8250df;--font-mono:ui-monospace,monospace;--font-sans:-apple-system,sans-serif;--radius:8px}');
+    p.push('*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.5;padding:32px 24px;max-width:960px;margin:0 auto}');
+    p.push('.page-title{font-size:18px;font-weight:700;margin-bottom:20px}.accent{color:var(--blue)}');
+    p.push('.detail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px}');
+    p.push('.detail-field{display:flex;flex-direction:column;gap:2px}.detail-field-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}.detail-field-value{font-family:var(--font-mono);font-size:13px;color:var(--text)}.ok{color:var(--green)}.err{color:var(--red)}.yes{color:var(--orange)}');
+    p.push('.sec-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 0;border-bottom:1px solid var(--border);margin-top:16px}.sec-body{padding:8px 0}');
+    p.push('.system-block{background:rgba(26,127,55,.06);border:1px solid rgba(26,127,55,.15);border-radius:6px;padding:12px 16px}.system-label{color:var(--green);font-size:10px;font-weight:600;margin-bottom:6px;text-transform:uppercase}.system-text{color:var(--text);font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:400px;overflow-y:auto}');
+    p.push('.msg-bubble{border-radius:8px;padding:10px 14px;max-width:95%;margin-bottom:8px}.user{background:rgba(9,105,218,.08);border:1px solid rgba(9,105,218,.15)}.assistant{background:rgba(130,80,223,.06);border:1px solid rgba(130,80,223,.1)}');
+    p.push('.msg-role{font-size:10px;font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}.user .msg-role{color:var(--blue)}.assistant .msg-role{color:var(--purple)}');
+    p.push('.msg-text{color:var(--text);white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.7}.content-block{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-top:6px}');
+    p.push('.cb-type{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:2px 6px;border-radius:3px;background:rgba(9,105,218,.12);color:var(--blue)}.tool_use{background:rgba(188,76,0,.12);color:var(--orange)}.tool_result{background:rgba(26,127,55,.12);color:var(--green)}.thinking{background:rgba(130,80,223,.12);color:var(--purple)}');
+    p.push('.cb-meta{font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-left:8px}');
+    p.push('.tool-def-card{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin:8px 0}.tool-def-name{color:var(--blue);font-weight:600;font-size:12px}.tool-def-desc{color:var(--muted);font-size:11px;margin-top:2px}.tool-def-schema{color:var(--muted);font-size:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-top:6px;border-top:1px solid var(--border);padding-top:6px}');
+    p.push('.struct-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;background:var(--bg-card);border-radius:6px;padding:10px 14px;font-size:11px}.struct-meta-key{color:var(--muted)}.struct-meta-val{color:var(--text);font-family:var(--font-mono)}');
+    p.push('.footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}');
+    p.push('@media(max-width:768px){.detail-grid{grid-template-columns:1fr 1fr}}');
+    p.push('</style></head><body>');
+    p.push('<div class="page-title"><span class="accent">Session</span> Report</div>');
+    p.push('<div class="detail-grid">');
+    p.push(md('Model', r.model)); p.push(md('Provider', r.provider)); p.push(md('Resolved Model', r.resolvedModel));
+    p.push(md('Stream', r.stream ? 'Yes' : 'No', r.stream ? 'yes' : ''));
+    p.push(md('Latency', fmtLat(r.latencyMs))); p.push(md('Timestamp', fmtTime(r.timestamp)));
+    p.push(md('Input Tokens', fmtTok(r.inputTokens))); p.push(md('Output Tokens', fmtTok(r.outputTokens)));
+    p.push(md('Cache Creation', fmtTok(r.cacheCreationTokens))); p.push(md('Cache Read', fmtTok(r.cacheReadTokens)));
+    p.push(md('Tool Count', String(r.toolCount))); p.push(md('Message Count', String(r.messageCount)));
+    p.push(md('Has Thinking', r.hasThinking ? 'Yes' : 'No', r.hasThinking ? 'yes' : ''));
+    p.push(md('Thinking Budget', r.thinkingBudget ? fmtTok(r.thinkingBudget) : '--'));
+    p.push(md('System Length', r.systemLength ? r.systemLength.toLocaleString() + ' chars' : '--'));
+    p.push(md('Status', r.status === 'success' ? 'Success' : 'Error', r.status === 'success' ? 'ok' : 'err'));
+    p.push('</div>');
+    p.push('<div class="sec-title">Request Config</div><div class="sec-body"><div class="struct-meta">');
+    var cfgFields = [['model', fr.model], ['max_tokens', fr.max_tokens], ['stream', fr.stream]];
+    if (fr.temperature !== undefined) cfgFields.push(['temperature', fr.temperature]);
+    if (fr.tool_choice) cfgFields.push(['tool_choice', fr.tool_choice.type]);
+    if (fr.thinking) cfgFields.push(['thinking_budget', fr.thinking.budget_tokens]);
+    for (var i = 0; i < cfgFields.length; i++) {
+      p.push('<span class="struct-meta-key">' + escH(cfgFields[i][0]) + '</span><span class="struct-meta-val">' + escH(String(cfgFields[i][1])) + '</span>');
+    }
+    p.push('</div></div>');
+    if (fr.system) {
+      var stxt = typeof fr.system === 'string' ? fr.system : fr.system.map(function(b) { return b.text; }).join('\n');
+      p.push('<div class="sec-title">System Prompt</div><div class="sec-body"><div class="system-block"><div class="system-label">SYSTEM</div><div class="system-text">' + escH(stxt) + '</div></div></div>');
+    }
+    if (fr.messages && fr.messages.length) {
+      p.push('<div class="sec-title">Messages (' + fr.messages.length + ')</div><div class="sec-body">');
+      for (var mi = 0; mi < fr.messages.length; mi++) {
+        var msg = fr.messages[mi];
+        p.push('<div class="msg-bubble ' + msg.role + '"><div class="msg-role">' + escH(msg.role) + ' #' + (mi + 1) + '</div>');
+        if (typeof msg.content === 'string') {
+          p.push('<div class="msg-text">' + escH(msg.content) + '</div>');
+        } else if (Array.isArray(msg.content)) {
+          for (var ci = 0; ci < msg.content.length; ci++) {
+            var block = msg.content[ci];
+            p.push('<div class="content-block"><span class="cb-type ' + escH(block.type) + '">' + escH(block.type) + '</span>');
+            if (block.type === 'text') {
+              p.push('<div class="msg-text" style="margin-top:4px">' + escH(block.text) + '</div>');
+            } else if (block.type === 'tool_use') {
+              p.push('<span class="cb-meta">' + escH(block.name) + '</span>');
+              if (block.input && Object.keys(block.input).length) {
+                p.push('<div class="tool-def-schema">' + escH(JSON.stringify(block.input, null, 2)) + '</div>');
+              }
+            } else if (block.type === 'tool_result') {
+              p.push('<span class="cb-meta">id:' + escH(block.tool_use_id) + '</span>');
+              if (typeof block.content === 'string') p.push('<div class="msg-text" style="margin-top:4px">' + escH(block.content) + '</div>');
+            } else if (block.type === 'thinking') {
+              p.push('<div class="msg-text" style="margin-top:4px;color:var(--muted)">' + escH(block.thinking) + '</div>');
+            }
+            p.push('</div>');
+          }
+        }
+        p.push('</div>');
+      }
+      p.push('</div>');
+    }
+    if (fr.tools && fr.tools.length) {
+      p.push('<div class="sec-title">Tool Definitions (' + fr.tools.length + ')</div><div class="sec-body">');
+      for (var ti = 0; ti < fr.tools.length; ti++) {
+        var tool = fr.tools[ti];
+        p.push('<div class="tool-def-card"><div class="tool-def-name">' + escH(tool.name) + '</div>');
+        if (tool.description) p.push('<div class="tool-def-desc">' + escH(tool.description) + '</div>');
+        if (tool.input_schema) p.push('<div class="tool-def-schema">' + escH(JSON.stringify(tool.input_schema, null, 2)) + '</div>');
+        p.push('</div>');
+      }
+      p.push('</div>');
+    }
+    p.push('<div class="footer">Exported from cc-router on ' + new Date().toISOString() + '</div>');
+    p.push('</body></html>');
+    var blob = new Blob([p.join('\n')], { type: 'text/html' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'session-' + r.id.slice(0, 8) + '.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function md(label, value, cls) {
+    return '<div class="detail-field"><span class="detail-field-label">' + escH(label) + '</span><span class="detail-field-value' + (cls ? ' ' + cls : '') + '">' + escH(value) + '</span></div>';
+  }
+
+  var params = new URLSearchParams(window.location.search);
+  var id = params.get('id');
+  if (!id) {
+    document.getElementById('loadingArea').textContent = 'Missing request ID.';
+    document.getElementById('loadingArea').classList.add('error-msg');
+    return;
+  }
+
+  apiGet('/api/requests/' + encodeURIComponent(id)).then(function(r) {
+    if (!r.ok) throw new Error('Request not found');
+    return r.json();
+  }).then(renderSession).catch(function(err) {
+    var el = document.getElementById('loadingArea');
+    el.textContent = 'Error: ' + err.message;
+    el.classList.add('error-msg');
+  });
+
+  document.getElementById('exportFab').addEventListener('click', exportAsHtml);
+})();
+</script>
+</body>
+</html>

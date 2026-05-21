@@ -146,6 +146,7 @@ export function createApiRoutes(
       } else {
         count = store.clearAll();
       }
+      metrics.clear();
       return c.json({ deleted: count });
     },
   };

@@ -25,5 +25,9 @@ export default defineConfig({
       join(process.cwd(), "src/dashboard/index.html"),
       join(distDashboardDir, "index.html"),
     );
+    copyFileSync(
+      join(process.cwd(), "src/dashboard/session.html"),
+      join(distDashboardDir, "session.html"),
+    );
   },
 });
