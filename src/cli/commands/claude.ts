@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { select, checkbox, confirm, input } from "@inquirer/prompts";
+import { select, multiselect, confirm, text, isCancel } from "@clack/prompts";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -8,13 +8,6 @@ import { generateEnvVars, backupSettings, SETTINGS_PATH } from "./inject.js";
 import manifest from "../../claude-settings-manifest.json" with { type: "json" };
 
 type Settings = Record<string, unknown>;
-
-const CANCELLED = Symbol("cancelled");
-type MaybeCancelled<T> = T | typeof CANCELLED;
-
-function isCancelled<T>(val: MaybeCancelled<T>): val is typeof CANCELLED {
-  return val === CANCELLED;
-}
 
 // Patch process.stdin.emit to translate j/k keypresses to up/down when vimKeysEnabled
 let vimKeysEnabled = false;
@@ -44,31 +37,22 @@ process.stdin.emit = function (event: string, ...args: unknown[]) {
   return origEmit.call(process.stdin, event, ...args);
 };
 
-async function vimSelect<T>(opts: Parameters<typeof select<T>>[0]): Promise<MaybeCancelled<T>> {
+async function vimSelect<T>(opts: Parameters<typeof select<T>>[0]): Promise<T | symbol> {
   vimKeysEnabled = true;
-  return select<T>(opts)
-    .catch((err) => {
-      if (err instanceof Error && err.name === "ExitPromptError") return CANCELLED as T;
-      throw err;
-    })
-    .finally(() => { vimKeysEnabled = false; });
+  try {
+    return await select<T>(opts);
+  } finally {
+    vimKeysEnabled = false;
+  }
 }
 
-async function vimCheckbox<T>(opts: Parameters<typeof checkbox<T>>[0]): Promise<MaybeCancelled<T>> {
+async function vimMultiselect<T>(opts: Parameters<typeof multiselect<T>>[0]): Promise<T[] | symbol> {
   vimKeysEnabled = true;
-  return checkbox<T>(opts)
-    .catch((err) => {
-      if (err instanceof Error && err.name === "ExitPromptError") return CANCELLED as T;
-      throw err;
-    })
-    .finally(() => { vimKeysEnabled = false; });
-}
-
-function safe<T>(promise: Promise<T>): Promise<MaybeCancelled<T>> {
-  return promise.catch((err) => {
-    if (err instanceof Error && err.name === "ExitPromptError") return CANCELLED;
-    throw err;
-  });
+  try {
+    return await multiselect<T>(opts);
+  } finally {
+    vimKeysEnabled = false;
+  }
 }
 
 const FEATURE_FLAGS = [
@@ -152,21 +136,24 @@ async function showCCRouterEnv(): Promise<void> {
   console.log();
 }
 
-async function configureFeatureFlags(settings: Settings): Promise<MaybeCancelled<Settings>> {
+async function configureFeatureFlags(settings: Settings): Promise<Settings | symbol> {
   const env = { ...(settings.env as Record<string, string> | undefined) };
   const choices = FEATURE_FLAGS.map((flag) => ({
-    name: flag.replace(/CLAUDE_CODE_/g, "").replace(/_/g, " ").toLowerCase(),
+    label: flag.replace(/CLAUDE_CODE_/g, "").replace(/_/g, " ").toLowerCase(),
     value: flag,
-    description: getDescription(`env.${flag}`),
-    checked: env[flag] === "1" || env[flag] === "true",
+    hint: getDescription(`env.${flag}`),
   }));
+  const initialValues = FEATURE_FLAGS.filter(
+    (flag) => env[flag] === "1" || env[flag] === "true",
+  );
 
-  const enabled = await vimCheckbox({
+  const enabled = await vimMultiselect({
     message: "Feature flags (j/k navigate, space toggle, ESC back)",
-    choices,
+    options: choices,
     required: false,
+    initialValues,
   });
-  if (isCancelled(enabled)) return CANCELLED;
+  if (isCancel(enabled)) return enabled;
 
   for (const flag of FEATURE_FLAGS) {
     env[flag] = (enabled as string[]).includes(flag) ? "1" : "0";
@@ -175,67 +162,63 @@ async function configureFeatureFlags(settings: Settings): Promise<MaybeCancelled
   return { ...settings, env };
 }
 
-async function configureToolSearch(settings: Settings): Promise<MaybeCancelled<Settings>> {
+async function configureToolSearch(settings: Settings): Promise<Settings | symbol> {
   const env = { ...(settings.env as Record<string, string> | undefined) };
-  const current = env.ENABLE_TOOL_SEARCH ?? "auto";
   const value = await vimSelect({
     message: "Tool search (j/k navigate, ESC back)",
-    choices: ["auto", "true", "false"].map((v) => ({
-      name: v,
-      value: v,
-      description: v === "auto" ? "Decide automatically based on query" : v === "true" ? "Always enable" : "Always disable",
-    })),
-    default: current,
+    options: [
+      { label: "auto", value: "auto", hint: "Decide automatically based on query" },
+      { label: "true", value: "true", hint: "Always enable" },
+      { label: "false", value: "false", hint: "Always disable" },
+    ],
+    initialValue: env.ENABLE_TOOL_SEARCH ?? "auto",
   });
-  if (isCancelled(value)) return CANCELLED;
+  if (isCancel(value)) return value;
   env.ENABLE_TOOL_SEARCH = value as string;
   return { ...settings, env };
 }
 
-async function configurePreferences(settings: Settings): Promise<MaybeCancelled<Settings>> {
-  const next = structuredClone(settings);
+async function configurePreferences(settings: Settings): Promise<Settings | symbol> {
+  let next = structuredClone(settings);
 
-  const currentEffort = (next.effortLevel as string) ?? "high";
   const effort = await vimSelect({
     message: "Effort level (j/k navigate, ESC back)",
-    choices: ["low", "med", "high", "xhigh"].map((v) => ({
-      name: v,
-      value: v,
-      description: getDescription("effortLevel"),
-    })),
-    default: currentEffort,
+    options: [
+      { label: "low", value: "low", hint: getDescription("effortLevel") },
+      { label: "med", value: "med", hint: getDescription("effortLevel") },
+      { label: "high", value: "high", hint: getDescription("effortLevel") },
+      { label: "xhigh", value: "xhigh", hint: getDescription("effortLevel") },
+    ],
+    initialValue: (next.effortLevel as string) ?? "high",
   });
-  if (isCancelled(effort)) return CANCELLED;
+  if (isCancel(effort)) return effort;
   next.effortLevel = effort as string;
 
-  const currentEditor = (next.editorMode as string) ?? "default";
   const editor = await vimSelect({
     message: "Editor mode (j/k navigate, ESC back)",
-    choices: ["default", "vim", "emacs"].map((v) => ({
-      name: v,
-      value: v,
-      description: getDescription("editorMode"),
-    })),
-    default: currentEditor,
+    options: [
+      { label: "default", value: "default", hint: getDescription("editorMode") },
+      { label: "vim", value: "vim", hint: getDescription("editorMode") },
+      { label: "emacs", value: "emacs", hint: getDescription("editorMode") },
+    ],
+    initialValue: (next.editorMode as string) ?? "default",
   });
-  if (isCancelled(editor)) return CANCELLED;
+  if (isCancel(editor)) return editor;
   next.editorMode = editor as string;
 
   const afterToolSearch = await configureToolSearch(next);
-  if (isCancelled(afterToolSearch)) return CANCELLED;
-  Object.assign(next, afterToolSearch);
+  if (isCancel(afterToolSearch)) return afterToolSearch;
+  next = afterToolSearch;
 
-  const currentRate = (next.feedbackSurveyRate as number) ?? 0;
-  const rateInput = await safe(input({
+  const rateInput = await text({
     message: "Feedback survey rate (0 = disabled)",
-    default: String(currentRate),
+    initialValue: String((next.feedbackSurveyRate as number) ?? 0),
     validate: (v) => {
       const n = Number(v);
       if (isNaN(n) || n < 0 || n > 1) return "Must be a number between 0 and 1";
-      return true;
     },
-  }));
-  if (isCancelled(rateInput)) return CANCELLED;
+  });
+  if (isCancel(rateInput)) return rateInput;
   next.feedbackSurveyRate = Number(rateInput);
 
   const boolPrefs = [
@@ -247,19 +230,22 @@ async function configurePreferences(settings: Settings): Promise<MaybeCancelled<
     { key: "includeGitInstructions", label: "Include git instructions" },
   ];
 
-  const boolChoices = boolPrefs.map((p) => ({
-    name: p.label,
+  const boolOptions = boolPrefs.map((p) => ({
+    label: p.label,
     value: p.key,
-    description: getDescription(p.key),
-    checked: (next[p.key] as boolean) ?? false,
+    hint: getDescription(p.key),
   }));
+  const boolInitialValues = boolPrefs
+    .filter((p) => (next[p.key] as boolean) ?? false)
+    .map((p) => p.key);
 
-  const enabledBools = await vimCheckbox({
+  const enabledBools = await vimMultiselect({
     message: "Preferences (j/k navigate, space toggle, ESC back)",
-    choices: boolChoices,
+    options: boolOptions,
     required: false,
+    initialValues: boolInitialValues,
   });
-  if (isCancelled(enabledBools)) return CANCELLED;
+  if (isCancel(enabledBools)) return enabledBools;
 
   for (const p of boolPrefs) {
     next[p.key] = (enabledBools as string[]).includes(p.key);
@@ -268,21 +254,21 @@ async function configurePreferences(settings: Settings): Promise<MaybeCancelled<
   return next;
 }
 
-async function configureAttribution(settings: Settings): Promise<MaybeCancelled<Settings>> {
+async function configureAttribution(settings: Settings): Promise<Settings | symbol> {
   const attr = { ...((settings.attribution as Record<string, string>) ?? { commit: "", pr: "" }) };
 
-  const commit = await safe(input({
+  const commit = await text({
     message: "Commit attribution",
-    default: attr.commit ?? "",
-  }));
-  if (isCancelled(commit)) return CANCELLED;
+    initialValue: attr.commit ?? "",
+  });
+  if (isCancel(commit)) return commit;
   attr.commit = commit as string;
 
-  const pr = await safe(input({
+  const pr = await text({
     message: "PR attribution",
-    default: attr.pr ?? "",
-  }));
-  if (isCancelled(pr)) return CANCELLED;
+    initialValue: attr.pr ?? "",
+  });
+  if (isCancel(pr)) return pr;
   attr.pr = pr as string;
 
   return { ...settings, attribution: attr };
@@ -300,24 +286,24 @@ export function registerClaudeCommand(program: Command): void {
       const presetList = Object.entries(manifest._presets as Record<string, { name: string; description: string }>);
       const presetChoice = await vimSelect<string | null>({
         message: "Choose a preset to start from (j/k navigate, ESC cancel)",
-        choices: [
-          { name: "None — keep current settings", value: "__none__", description: "Start with your current settings.json values" },
+        options: [
+          { label: "None — keep current settings", value: "__none__", hint: "Start with your current settings.json values" },
           ...presetList.map(([id, p]) => ({
-            name: `${p.name} — ${p.description}`,
+            label: `${p.name} — ${p.description}`,
             value: id,
-            description: p.description,
+            hint: p.description,
           })),
         ],
-        default: "__none__",
+        initialValue: "__none__",
       });
-      if (isCancelled(presetChoice)) {
-        console.log("\nCancelled.");
+      if (isCancel(presetChoice)) {
+        console.log("Cancelled.");
         return;
       }
 
       if (presetChoice && presetChoice !== "__none__") {
-        settings = applyPreset(settings, presetChoice);
-        console.log(`Applied preset: ${(manifest._presets as Record<string, { name: string }>)[presetChoice].name}\n`);
+        settings = applyPreset(settings, presetChoice as string);
+        console.log(`Applied preset: ${(manifest._presets as Record<string, { name: string }>)[presetChoice as string].name}\n`);
       }
 
       try {
@@ -336,17 +322,17 @@ export function registerClaudeCommand(program: Command): void {
       while (true) {
         const action = await vimSelect({
           message: "What would you like to configure? (j/k navigate, ESC cancel)",
-          choices: [
-            { name: "CC-Router env vars (read-only)", value: "cc-router-env", description: "View auto-injected environment variables" },
-            { name: "Feature flags", value: "features", description: "Toggle Claude Code behaviors" },
-            { name: "Preferences", value: "preferences", description: "Effort level, editor mode, IDE, misc settings" },
-            { name: "Attribution", value: "attribution", description: "Git commit/PR attribution metadata" },
-            { name: "Review & save", value: "save" },
-            { name: "Cancel", value: "cancel" },
+          options: [
+            { label: "CC-Router env vars (read-only)", value: "cc-router-env", hint: "View auto-injected environment variables" },
+            { label: "Feature flags", value: "features", hint: "Toggle Claude Code behaviors" },
+            { label: "Preferences", value: "preferences", hint: "Effort level, editor mode, IDE, misc settings" },
+            { label: "Attribution", value: "attribution", hint: "Git commit/PR attribution metadata" },
+            { label: "Review & save", value: "save" },
+            { label: "Cancel", value: "cancel" },
           ],
         });
-        if (isCancelled(action)) {
-          console.log("\nCancelled.");
+        if (isCancel(action)) {
+          console.log("Cancelled.");
           return;
         }
 
@@ -362,19 +348,19 @@ export function registerClaudeCommand(program: Command): void {
 
         if (action === "features") {
           const result = await configureFeatureFlags(current);
-          if (!isCancelled(result)) current = result;
+          if (!isCancel(result)) current = result;
           continue;
         }
 
         if (action === "preferences") {
           const result = await configurePreferences(current);
-          if (!isCancelled(result)) current = result;
+          if (!isCancel(result)) current = result;
           continue;
         }
 
         if (action === "attribution") {
           const result = await configureAttribution(current);
-          if (!isCancelled(result)) current = result;
+          if (!isCancel(result)) current = result;
           continue;
         }
 
@@ -397,8 +383,8 @@ export function registerClaudeCommand(program: Command): void {
       }
       console.log();
 
-      const ok = await safe(confirm({ message: "Apply these changes?", default: true }));
-      if (isCancelled(ok) || !ok) {
+      const ok = await confirm({ message: "Apply these changes?", initialValue: true });
+      if (isCancel(ok) || !ok) {
         console.log("Cancelled.");
         return;
       }

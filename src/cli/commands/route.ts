@@ -1,15 +1,18 @@
 import type { Command } from "commander";
-import { select, input, confirm } from "@inquirer/prompts";
+import { select, text, confirm, isCancel } from "@clack/prompts";
 import { loadConfig, saveConfig } from "../../config/loader.js";
-
-function handleCancel(): never {
-  console.log("\nCancelled.");
-  process.exit(0);
-}
 
 function fmtRoute(r: { match: string; provider: string; model?: string }): string {
   const modelSuffix = r.model ? ` → ${r.model}` : "";
   return `${r.match} → ${r.provider}${modelSuffix}`;
+}
+
+function orExit<T>(v: T | symbol): T {
+  if (isCancel(v)) {
+    console.log("\nCancelled.");
+    process.exit(0);
+  }
+  return v;
 }
 
 export function registerRouteCommand(program: Command): void {
@@ -44,53 +47,52 @@ export function registerRouteCommand(program: Command): void {
         process.exit(1);
       }
 
-      let match: string;
-      try {
-        match = (await input({
+      const match = orExit(
+        await text({
           message: "Match pattern (glob, e.g. *opus*, *sonnet*, *):",
-          validate: (v: string) => (v.trim() ? true : "Pattern is required"),
-        })).trim();
-      } catch { handleCancel() }
+          validate: (v: string) => (v.trim() ? undefined : "Pattern is required"),
+        }),
+      ).trim();
 
-      let provider: string;
-      try {
-        provider = await select({
+      const provider = orExit(
+        await select({
           message: "Provider:",
-          choices: providerNames.map((p) => ({ name: p, value: p })),
-        });
-      } catch { handleCancel() }
+          options: providerNames.map((p) => ({ label: p, value: p })),
+        }),
+      );
 
       let model: string | undefined;
-      try {
-        const hasModel = await confirm({
+      const hasModel = orExit(
+        await confirm({
           message: "Specify a model name for this route?",
-          default: true,
-        });
-        if (hasModel) {
-          model = (await input({
+          initialValue: true,
+        }),
+      );
+      if (hasModel) {
+        model = orExit(
+          await text({
             message: "Model name (e.g. deepseek-v4-pro, GLM-5.1):",
-            validate: (v: string) => (v.trim() ? true : "Model name is required"),
-          })).trim();
-        }
-      } catch { handleCancel() }
+            validate: (v: string) => (v.trim() ? undefined : "Model name is required"),
+          }),
+        ).trim();
+      }
 
-      let insertBefore: number;
-      try {
-        insertBefore = await select({
+      const insertBefore = orExit(
+        await select({
           message: "Insert position (routes match top-down, first match wins):",
-          choices: [
-            { name: "Top (highest priority)", value: 0 },
+          options: [
+            { label: "Top (highest priority)", value: 0 },
             ...config.routes.map((r, i) => ({
-              name: `After route ${i + 1} (${r.match})`,
+              label: `After route ${i + 1} (${r.match})`,
               value: i + 1,
             })),
-            { name: "Bottom (lowest priority)", value: config.routes.length },
+            { label: "Bottom (lowest priority)", value: config.routes.length },
           ],
-        });
-      } catch { handleCancel() }
+        }),
+      );
 
-      const newRoute = { match: match!, provider: provider!, model };
-      config.routes.splice(insertBefore!, 0, newRoute);
+      const newRoute = { match, provider, model };
+      config.routes.splice(insertBefore, 0, newRoute);
 
       saveConfig(config);
       console.log(`\nRoute added: ${fmtRoute(newRoute)}`);
@@ -109,62 +111,60 @@ export function registerRouteCommand(program: Command): void {
 
       const providerNames = Object.keys(config.providers);
 
-      let index: number;
-      try {
-        index = await select({
+      const index = orExit(
+        await select({
           message: "Select route to edit:",
-          choices: config.routes.map((r, i) => ({
-            name: `${i + 1}. ${fmtRoute(r)}`,
+          options: config.routes.map((r, i) => ({
+            label: `${i + 1}. ${fmtRoute(r)}`,
             value: i,
           })),
-        });
-      } catch { handleCancel() }
+        }),
+      );
 
-      const current = config.routes[index!];
+      const current = config.routes[index];
 
-      let match: string;
-      try {
-        match = (await input({
+      const match = orExit(
+        await text({
           message: "Match pattern:",
-          default: current.match,
-          validate: (v: string) => (v.trim() ? true : "Pattern is required"),
-        })).trim();
-      } catch { handleCancel() }
+          initialValue: current.match,
+          validate: (v: string) => (v.trim() ? undefined : "Pattern is required"),
+        }),
+      ).trim();
 
-      let provider: string;
-      try {
-        provider = await select({
+      const provider = orExit(
+        await select({
           message: "Provider:",
-          choices: providerNames.map((p) => ({
-            name: p === current.provider ? `${p} (current)` : p,
+          options: providerNames.map((p) => ({
+            label: p === current.provider ? `${p} (current)` : p,
             value: p,
           })),
-          default: undefined,
-        });
-      } catch { handleCancel() }
+        }),
+      );
 
       let model: string | undefined;
-      try {
-        const setModel = await confirm({
+      const setModel = orExit(
+        await confirm({
           message: current.model
             ? `Change model? (current: ${current.model})`
             : "Set a model name?",
-          default: false,
-        });
-        if (setModel) {
-          model = (await input({
+          initialValue: false,
+        }),
+      );
+      if (setModel) {
+        model = orExit(
+          await text({
             message: "Model name:",
-            default: current.model,
-          })).trim();
-        } else {
-          model = current.model;
-        }
-      } catch { handleCancel() }
+            initialValue: current.model,
+          }),
+        ).trim();
+      } else {
+        model = current.model;
+      }
 
-      config.routes[index!] = { match: match!, provider: provider!, model };
+      config.routes[index] = { match, provider, model };
       saveConfig(config);
 
-      console.log(`\nRoute updated: ${fmtRoute(config.routes[index!])}`);
+      console.log(`\nRoute updated: ${fmtRoute(config.routes[index])}`);
     });
 
   route
@@ -178,18 +178,17 @@ export function registerRouteCommand(program: Command): void {
         return;
       }
 
-      let index: number;
-      try {
-        index = await select({
+      const index = orExit(
+        await select({
           message: "Select route to remove:",
-          choices: config.routes.map((r, i) => ({
-            name: `${i + 1}. ${fmtRoute(r)}`,
+          options: config.routes.map((r, i) => ({
+            label: `${i + 1}. ${fmtRoute(r)}`,
             value: i,
           })),
-        });
-      } catch { handleCancel() }
+        }),
+      );
 
-      const removed = config.routes.splice(index!, 1)[0];
+      const removed = config.routes.splice(index, 1)[0];
       saveConfig(config);
 
       console.log(`\nRemoved: ${fmtRoute(removed)}`);
@@ -212,37 +211,35 @@ export function registerRouteCommand(program: Command): void {
       }
       console.log();
 
-      let fromIndex: number;
-      try {
-        fromIndex = await select({
+      const fromIndex = orExit(
+        await select({
           message: "Select route to move:",
-          choices: config.routes.map((r, i) => ({
-            name: `${i + 1}. ${fmtRoute(r)}`,
+          options: config.routes.map((r, i) => ({
+            label: `${i + 1}. ${fmtRoute(r)}`,
             value: i,
           })),
-        });
-      } catch { handleCancel() }
+        }),
+      );
 
-      const [moved] = config.routes.splice(fromIndex!, 1);
+      const [moved] = config.routes.splice(fromIndex, 1);
 
       const remainingPositions = config.routes.map((r, i) => ({
-        name: `Before: ${i + 1}. ${fmtRoute(r)}`,
+        label: `Before: ${i + 1}. ${fmtRoute(r)}`,
         value: i,
       }));
       remainingPositions.push({
-        name: "Last position",
+        label: "Last position",
         value: config.routes.length,
       });
 
-      let toIndex: number;
-      try {
-        toIndex = await select({
+      const toIndex = orExit(
+        await select({
           message: "Move to position:",
-          choices: remainingPositions,
-        });
-      } catch { handleCancel() }
+          options: remainingPositions,
+        }),
+      );
 
-      config.routes.splice(toIndex!, 0, moved);
+      config.routes.splice(toIndex, 0, moved);
       saveConfig(config);
 
       console.log("\nUpdated route order:\n");

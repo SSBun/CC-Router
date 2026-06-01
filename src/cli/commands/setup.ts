@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { select, input, confirm } from "@inquirer/prompts";
+import { select, text, confirm, intro, outro, isCancel, log } from "@clack/prompts";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { parse } from "yaml";
@@ -19,77 +19,100 @@ const TYPE_DEFAULTS: Record<string, string> = {
   "openai-compatible": "https://api.openai.com/v1",
 };
 
+function orExit<T>(v: T | symbol): T {
+  if (isCancel(v)) {
+    outro("Setup cancelled.");
+    process.exit(0);
+  }
+  return v;
+}
+
 export function registerSetupCommand(program: Command): void {
   program
     .command("setup")
     .description("Interactive setup wizard")
     .action(async () => {
-      try {
-        console.log("CC-Router Setup\n");
+      intro("CC-Router Setup");
 
-        // Step 1: Add providers
+      // Step 1: Add providers
       const providers: Record<string, ProviderEntry> = {};
 
       while (true) {
         const hasProviders = Object.keys(providers).length > 0;
-        const addMore = await confirm({
-          message: hasProviders ? "Add another provider?" : "Add a provider?",
-          default: !hasProviders,
-        });
-
+        const addMore = orExit(
+          await confirm({
+            message: hasProviders ? "Add another provider?" : "Add a provider?",
+            initialValue: !hasProviders,
+          }),
+        );
         if (!addMore) break;
 
-        const type = await select({
-          message: "Provider type:",
-          choices: [
-            { name: "Anthropic-compatible", value: "anthropic-compatible" as const },
-            { name: "OpenAI-compatible", value: "openai-compatible" as const },
-          ],
-        });
+        const type = orExit(
+          await select({
+            message: "Provider type:",
+            options: [
+              { label: "Anthropic-compatible", value: "anthropic-compatible" as const },
+              { label: "OpenAI-compatible", value: "openai-compatible" as const },
+            ],
+          }),
+        );
 
-        const name = await input({
-          message: "Provider name (e.g. anthropic, openai, deepseek):",
-          validate: (v: string) => {
-            if (!v.trim()) return "Name is required";
-            if (providers[v.trim()]) return "Provider already exists";
-            return true;
-          },
-        });
+        const name = orExit(
+          await text({
+            message: "Provider name (e.g. anthropic, openai, deepseek):",
+            validate: (v: string) => {
+              if (!v.trim()) return "Name is required";
+              if (providers[v.trim()]) return "Provider already exists";
+            },
+          }),
+        );
 
-        const baseUrl = await input({
-          message: "Base URL:",
-          default: TYPE_DEFAULTS[type],
-        });
+        const baseUrl = orExit(
+          await text({
+            message: "Base URL:",
+            initialValue: TYPE_DEFAULTS[type],
+          }),
+        );
 
-        const apiKey = await input({
-          message: "API key (or env var like ${MY_API_KEY}):",
-        });
+        const apiKey = orExit(
+          await text({
+            message: "API key (or env var like ${MY_API_KEY}):",
+          }),
+        );
 
         const models: ProviderEntry["models"] = [];
         while (true) {
-          const addModel = await confirm({
-            message: models.length === 0 ? "Add a model?" : "Add another model?",
-            default: models.length === 0,
-          });
+          const addModel = orExit(
+            await confirm({
+              message: models.length === 0 ? "Add a model?" : "Add another model?",
+              initialValue: models.length === 0,
+            }),
+          );
           if (!addModel) break;
 
-          const modelId = await input({
-            message: "Model name (e.g. claude-sonnet-4-20250514, gpt-4o):",
-            validate: (v: string) => (v.trim() ? true : "Model name is required"),
-          });
+          const modelId = orExit(
+            await text({
+              message: "Model name (e.g. claude-sonnet-4-20250514, gpt-4o):",
+              validate: (v: string) => (v.trim() ? undefined : "Model name is required"),
+            }),
+          );
 
-          const maxInputStr = await input({
-            message: "Max input tokens (press Enter to skip):",
-            default: "",
-          });
+          const maxInputStr = orExit(
+            await text({
+              message: "Max input tokens (press Enter to skip):",
+              initialValue: "",
+            }),
+          );
           const maxInput = maxInputStr.trim()
             ? parseInt(maxInputStr.trim(), 10)
             : undefined;
 
-          const maxTokensStr = await input({
-            message: "Max output tokens (press Enter to skip):",
-            default: "",
-          });
+          const maxTokensStr = orExit(
+            await text({
+              message: "Max output tokens (press Enter to skip):",
+              initialValue: "",
+            }),
+          );
           const maxTokens = maxTokensStr.trim()
             ? parseInt(maxTokensStr.trim(), 10)
             : undefined;
@@ -109,11 +132,11 @@ export function registerSetupCommand(program: Command): void {
           models,
         };
 
-        console.log(`  Added provider "${name.trim()}" with ${models.length} model(s)\n`);
+        log.info(`Added provider "${name.trim()}" with ${models.length} model(s)`);
       }
 
       if (Object.keys(providers).length === 0) {
-        console.log("No providers added. Exiting.");
+        outro("No providers added. Exiting.");
         process.exit(1);
       }
 
@@ -123,12 +146,12 @@ export function registerSetupCommand(program: Command): void {
       // Build flat list of all models across all providers
       const allModelChoices = Object.entries(providers).flatMap(([pName, p]) =>
         p.models.map((m) => ({
-          name: `${m.id} (${pName})`,
+          label: `${m.id} (${pName})`,
           value: { provider: pName, model: m.id } as { provider: string; model: string },
         })),
       );
 
-      console.log("\n--- Configure Model Routing ---\n");
+      log.info("Configure Model Routing");
 
       const tiers = [
         { label: "Opus (most capable)", match: "*opus*" },
@@ -139,17 +162,20 @@ export function registerSetupCommand(program: Command): void {
       for (const tier of tiers) {
         if (allModelChoices.length === 0) break;
 
-        const configure = await confirm({
-          message: `Configure ${tier.label} routing?`,
-          default: true,
-        });
-
+        const configure = orExit(
+          await confirm({
+            message: `Configure ${tier.label} routing?`,
+            initialValue: true,
+          }),
+        );
         if (!configure) continue;
 
-        const chosen = await select({
-          message: `Which model for ${tier.label}?`,
-          choices: allModelChoices,
-        });
+        const chosen = orExit(
+          await select({
+            message: `Which model for ${tier.label}?`,
+            options: allModelChoices,
+          }),
+        );
 
         routes.push({
           match: tier.match,
@@ -157,51 +183,63 @@ export function registerSetupCommand(program: Command): void {
           model: chosen.model,
         });
 
-        console.log(`  ${tier.label}: ${chosen.model} → ${chosen.provider}\n`);
+        log.info(`${tier.label}: ${chosen.model} → ${chosen.provider}`);
       }
 
       // Catch-all route
       if (routes.length > 0) {
-        const addCatchAll = await confirm({
-          message: "Add a catch-all route for unmatched models?",
-          default: true,
-        });
+        const addCatchAll = orExit(
+          await confirm({
+            message: "Add a catch-all route for unmatched models?",
+            initialValue: true,
+          }),
+        );
 
         if (addCatchAll) {
-          const chosen = await select({
-            message: "Which model for catch-all?",
-            choices: allModelChoices,
-          });
+          const chosen = orExit(
+            await select({
+              message: "Which model for catch-all?",
+              options: allModelChoices,
+            }),
+          );
           routes.push({ match: "*", provider: chosen.provider, model: chosen.model });
-          console.log(`  Catch-all: ${chosen.model} → ${chosen.provider}\n`);
+          log.info(`Catch-all: ${chosen.model} → ${chosen.provider}`);
         }
       } else if (allModelChoices.length > 0) {
-        const chosen = await select({
-          message: "Select default model (catch-all route):",
-          choices: allModelChoices,
-        });
+        const chosen = orExit(
+          await select({
+            message: "Select default model (catch-all route):",
+            options: allModelChoices,
+          }),
+        );
         routes.push({ match: "*", provider: chosen.provider, model: chosen.model });
       } else {
         const providerNames = Object.keys(providers);
-        const defaultProvider = await select({
-          message: "Select default provider (catch-all route):",
-          choices: providerNames.map((p) => ({ name: p, value: p })),
-        });
+        const defaultProvider = orExit(
+          await select({
+            message: "Select default provider (catch-all route):",
+            options: providerNames.map((p) => ({ label: p, value: p })),
+          }),
+        );
         routes.push({ match: "*", provider: defaultProvider });
       }
 
       // Step 3: Server config
-      console.log("\n--- Server Config ---\n");
+      log.info("Server Config");
 
-      const host = await input({
-        message: "Server host:",
-        default: "127.0.0.1",
-      });
+      const host = orExit(
+        await text({
+          message: "Server host:",
+          initialValue: "127.0.0.1",
+        }),
+      );
 
-      const port = await input({
-        message: "Server port:",
-        default: "8787",
-      });
+      const port = orExit(
+        await text({
+          message: "Server port:",
+          initialValue: "8787",
+        }),
+      );
 
       // Step 4: Build and save config
       // Reuse existing auth_token if config file already exists
@@ -243,12 +281,14 @@ export function registerSetupCommand(program: Command): void {
       saveConfig(config);
 
       const configPath = getConfigPath();
-      console.log(`\nConfig saved to ${configPath}`);
-      console.log("\nTo start CC-Router, run:");
-      console.log("  cc-router start\n");
-      console.log("Then add these to your shell:");
-      console.log(`export ANTHROPIC_BASE_URL="http://${host}:${port}"`);
-      console.log(`export ANTHROPIC_AUTH_TOKEN="${config.server.auth_token}"`);
+      outro(`Config saved to ${configPath}`);
+
+      log.info("To start CC-Router, run:");
+      log.info("  cc-router start\n");
+      log.info("Then add these to your shell:");
+      log.step(`export ANTHROPIC_BASE_URL="http://${host}:${port}"`);
+      log.step(`export ANTHROPIC_AUTH_TOKEN="${config.server.auth_token}"`);
+
       const MODEL_TIERS = [
         { match: "*opus*", envVar: "ANTHROPIC_DEFAULT_OPUS_MODEL" },
         { match: "*sonnet*", envVar: "ANTHROPIC_DEFAULT_SONNET_MODEL" },
@@ -268,16 +308,8 @@ export function registerSetupCommand(program: Command): void {
               break;
             }
           }
-          console.log(`export ${tier.envVar}="${modelId}${ctx}"`);
+          log.step(`export ${tier.envVar}="${modelId}${ctx}"`);
         }
-      }
-      console.log();
-      } catch (err) {
-        if (err instanceof Error && err.name === "ExitPromptError") {
-          console.log("\nSetup cancelled.");
-          process.exit(0);
-        }
-        throw err;
       }
     });
 }
