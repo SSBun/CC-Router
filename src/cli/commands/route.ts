@@ -15,6 +15,30 @@ function orExit<T>(v: T | symbol): T {
   return v;
 }
 
+async function fetchProviderModels(config: ReturnType<typeof loadConfig>, providerName: string): Promise<string[]> {
+  const provider = config.providers[providerName];
+  if (!provider) return [];
+  const base = provider.base_url.replace(/\/+$/, "");
+  const urls = [`${base}/models`, `${base}/v1/models`];
+  const headers: Record<string, string> = { ...(provider.headers ?? {}) };
+  if (provider.type === "anthropic-compatible") {
+    headers["x-api-key"] = provider.api_key;
+    headers["anthropic-version"] = "2023-06-01";
+  } else {
+    headers["Authorization"] = `Bearer ${provider.api_key}`;
+  }
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+      const body = (await res.json()) as { data?: Array<{ id: string }> };
+      if (!Array.isArray(body.data)) continue;
+      return body.data.map((m) => m.id).sort();
+    } catch { /* try next url */ }
+  }
+  return [];
+}
+
 export function registerRouteCommand(program: Command): void {
   const route = program.command("route").description("Manage routing rules");
 
@@ -69,12 +93,35 @@ export function registerRouteCommand(program: Command): void {
         }),
       );
       if (hasModel) {
-        model = orExit(
-          await text({
-            message: "Model name (e.g. deepseek-v4-pro, GLM-5.1):",
-            validate: (v: string) => (v.trim() ? undefined : "Model name is required"),
-          }),
-        ).trim();
+        const remoteModels = await fetchProviderModels(config, provider);
+        if (remoteModels.length > 0) {
+          const chosen = orExit(
+            await select({
+              message: "Model name:",
+              options: [
+                ...remoteModels.map((m) => ({ label: m, value: m })),
+                { label: "Type custom...", value: "__custom__" },
+              ],
+            }),
+          );
+          if (chosen === "__custom__") {
+            model = orExit(
+              await text({
+                message: "Model name:",
+                validate: (v: string) => (v.trim() ? undefined : "Model name is required"),
+              }),
+            ).trim();
+          } else {
+            model = chosen;
+          }
+        } else {
+          model = orExit(
+            await text({
+              message: "Model name (e.g. deepseek-v4-pro, GLM-5.1):",
+              validate: (v: string) => (v.trim() ? undefined : "Model name is required"),
+            }),
+          ).trim();
+        }
       }
 
       const insertBefore = orExit(
@@ -151,12 +198,35 @@ export function registerRouteCommand(program: Command): void {
         }),
       );
       if (setModel) {
-        model = orExit(
-          await text({
-            message: "Model name:",
-            initialValue: current.model,
-          }),
-        ).trim();
+        const remoteModels = await fetchProviderModels(config, provider);
+        if (remoteModels.length > 0) {
+          const chosen = orExit(
+            await select({
+              message: "Model name:",
+              options: [
+                ...remoteModels.map((m) => ({ label: m, value: m })),
+                { label: "Type custom...", value: "__custom__" },
+              ],
+            }),
+          );
+          if (chosen === "__custom__") {
+            model = orExit(
+              await text({
+                message: "Model name:",
+                initialValue: current.model,
+              }),
+            ).trim();
+          } else {
+            model = chosen;
+          }
+        } else {
+          model = orExit(
+            await text({
+              message: "Model name:",
+              initialValue: current.model,
+            }),
+          ).trim();
+        }
       } else {
         model = current.model;
       }
