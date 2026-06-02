@@ -53,7 +53,7 @@ export function backupSettings(): string | null {
 
 export function registerInjectCommand(program: Command): void {
   program
-    .command("inject", { hidden: true })
+    .command("inject")
     .description("Inject cc-router env vars into Claude Code settings.json")
     .option("--dry-run", "Print what would be written without modifying files")
     .option("--no-backup", "Skip creating a backup before modifying")
