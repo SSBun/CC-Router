@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { execSync } from "node:child_process";
+import { select, isCancel } from "@clack/prompts";
 import { loadConfig, getConfigPath } from "../../config/loader.js";
 import picomatch from "picomatch";
 import { modelIdWithSuffix } from "../../model-info/resolver.js";
@@ -93,9 +94,30 @@ export function registerConfigCommand(program: Command): void {
   cmd
     .command("models")
     .description("Fetch model list from provider(s) via /v1/models endpoint")
-    .argument("[name]", "Provider name (omit to query all providers)")
+    .argument("[name]", "Provider name (omit for interactive selection)")
     .action(async (name?: string) => {
       const config = loadConfig();
+
+      if (!name) {
+        const names = Object.keys(config.providers);
+        if (names.length === 0) {
+          console.log("No providers configured.");
+          return;
+        }
+        const chosen = await select({
+          message: "Select provider to fetch models:",
+          options: [
+            { label: "All providers", value: "__all__" },
+            ...names.map((n) => ({ label: n, value: n })),
+          ],
+        });
+        if (isCancel(chosen)) {
+          console.log("Cancelled.");
+          return;
+        }
+        name = chosen === "__all__" ? undefined : chosen;
+      }
+
       const providers = name
         ? config.providers[name]
           ? { [name]: config.providers[name] }
