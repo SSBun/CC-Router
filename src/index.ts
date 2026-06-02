@@ -2,8 +2,6 @@ import { Command } from "commander";
 import { registerStartCommand } from "./cli/commands/start.js";
 import { registerStopCommand } from "./cli/commands/stop.js";
 import { registerStatusCommand } from "./cli/commands/status.js";
-import { registerListCommand } from "./cli/commands/list.js";
-import { registerEnvCommand } from "./cli/commands/env.js";
 import { registerSetupCommand } from "./cli/commands/setup.js";
 import { registerConfigCommand } from "./cli/commands/config.js";
 import { registerChatCommand } from "./cli/commands/chat.js";
@@ -30,8 +28,6 @@ program
 registerStartCommand(program);
 registerStopCommand(program);
 registerStatusCommand(program);
-registerListCommand(program);
-registerEnvCommand(program);
 registerSetupCommand(program);
 registerConfigCommand(program);
 registerChatCommand(program);
