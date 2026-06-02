@@ -90,6 +90,60 @@ export function registerConfigCommand(program: Command): void {
       }
     });
 
+  cmd
+    .command("models")
+    .description("Fetch model list from provider(s) via /v1/models endpoint")
+    .argument("[name]", "Provider name (omit to query all providers)")
+    .action(async (name?: string) => {
+      const config = loadConfig();
+      const providers = name
+        ? config.providers[name]
+          ? { [name]: config.providers[name] }
+          : (() => { throw new Error(`Provider "${name}" not found`); })()
+        : config.providers;
+
+      for (const [pName, provider] of Object.entries(providers)) {
+        console.log(`\n${pName} (${provider.type})`);
+        console.log(`  base_url: ${provider.base_url}`);
+
+        const base = provider.base_url.replace(/\/+$/, "");
+        const urls = [`${base}/models`, `${base}/v1/models`];
+        const headers: Record<string, string> = {
+          ...(provider.headers ?? {}),
+        };
+        if (provider.type === "anthropic-compatible") {
+          headers["x-api-key"] = provider.api_key;
+          headers["anthropic-version"] = "2023-06-01";
+        } else {
+          headers["Authorization"] = `Bearer ${provider.api_key}`;
+        }
+
+        let ok = false;
+        for (const url of urls) {
+          try {
+            const res = await fetch(url, { headers, signal: AbortSignal.timeout(5000) });
+            if (!res.ok) continue;
+            const body = (await res.json()) as { data?: Array<{ id: string; owned_by?: string }> };
+            const data = body.data;
+            if (!Array.isArray(data)) continue;
+
+            for (const m of data) {
+              const by = m.owned_by ? ` (${m.owned_by})` : "";
+              console.log(`    - ${m.id}${by}`);
+            }
+            ok = true;
+            break;
+          } catch {
+            continue;
+          }
+        }
+
+        if (!ok) {
+          console.log(`  (no /v1/models endpoint available for this provider)`);
+        }
+      }
+    });
+
   // Default action: show config
   cmd.action(() => {
     const config = loadConfig();
