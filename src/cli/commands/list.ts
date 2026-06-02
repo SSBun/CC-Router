@@ -4,7 +4,7 @@ import { loadConfig } from "../../config/loader.js";
 export function registerListCommand(program: Command): void {
   program
     .command("list")
-    .description("List all configured providers and routes")
+    .description("(deprecated: use `config list`)")
     .action(() => {
       const config = loadConfig();
 

@@ -12,7 +12,7 @@ const MODEL_TIERS = [
 export function registerEnvCommand(program: Command): void {
   program
     .command("env")
-    .description("Print environment variable export statements")
+    .description("(deprecated: use `config env`)")
     .action(() => {
       const config = loadConfig();
       const { host, port, auth_token } = config.server;
