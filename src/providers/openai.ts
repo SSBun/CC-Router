@@ -14,11 +14,13 @@ export class OpenAIAdapter implements ProviderAdapter {
   constructor(private config: ProviderConfig) {}
 
   private buildHeaders(): Record<string, string> {
-    return {
+    const headers: Record<string, string> = {
       "content-type": "application/json",
-      authorization: `Bearer ${this.config.api_key}`,
-      ...this.config.headers,
     };
+    if (this.config.api_key) {
+      headers.authorization = `Bearer ${this.config.api_key}`;
+    }
+    return { ...headers, ...this.config.headers };
   }
 
   async send(

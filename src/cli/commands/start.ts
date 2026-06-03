@@ -8,7 +8,7 @@ import { logger } from "../../utils/logger.js";
 import { printBanner } from "../../utils/banner.js";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, unlinkSync } from "node:fs";
 
 const PID_DIR = join(homedir(), ".cc-router");
 const PID_FILE = join(PID_DIR, "cc-router.pid");
@@ -65,6 +65,13 @@ export function registerStartCommand(program: Command): void {
         }
 
         const { host, port, auth_token } = config.server;
+
+        // Write PID file for foreground mode too (enables `cc-router stop`)
+        mkdirSync(PID_DIR, { recursive: true });
+        writeFileSync(PID_FILE, String(process.pid), "utf-8");
+        process.on("exit", () => {
+          try { unlinkSync(PID_FILE); } catch {}
+        });
 
         console.log(`CC-Router running on http://${host}:${port}`);
         if (resolved) {
