@@ -1,6 +1,7 @@
 import type {
   ProviderAdapter,
   ProviderConfig,
+  ProviderAdapterOptions,
   AnthropicMessagesRequest,
   AnthropicMessagesResponse,
   AnthropicSSEEvent,
@@ -8,6 +9,7 @@ import type {
 import { convertRequestToOpenAI } from "../converters/messages.js";
 import { convertResponseToAnthropic } from "../converters/openai-to-anthropic.js";
 import { convertOpenAIStreamToAnthropic } from "../converters/stream.js";
+import { upstreamFetch } from "../utils/upstream-fetch.js";
 import { logger } from "../utils/logger.js";
 
 export class OpenAIAdapter implements ProviderAdapter {
@@ -26,6 +28,7 @@ export class OpenAIAdapter implements ProviderAdapter {
   async send(
     request: AnthropicMessagesRequest,
     model: string,
+    options?: ProviderAdapterOptions,
   ): Promise<AnthropicMessagesResponse> {
     const url = `${this.config.base_url}/chat/completions`;
     const openaiRequest = convertRequestToOpenAI(request);
@@ -34,11 +37,15 @@ export class OpenAIAdapter implements ProviderAdapter {
 
     logger.debug({ url, model }, "OpenAI adapter: sending request");
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: this.buildHeaders(),
-      body: JSON.stringify(openaiRequest),
-    });
+    const response = await upstreamFetch(
+      url,
+      {
+        method: "POST",
+        headers: this.buildHeaders(),
+        body: JSON.stringify(openaiRequest),
+      },
+      options,
+    );
 
     if (!response.ok) {
       await this.handleError(response);
@@ -74,6 +81,7 @@ export class OpenAIAdapter implements ProviderAdapter {
   async *sendStream(
     request: AnthropicMessagesRequest,
     model: string,
+    options?: ProviderAdapterOptions,
   ): AsyncIterable<AnthropicSSEEvent> {
     const url = `${this.config.base_url}/chat/completions`;
     const openaiRequest = convertRequestToOpenAI(request);
@@ -82,11 +90,18 @@ export class OpenAIAdapter implements ProviderAdapter {
 
     logger.debug({ url, model }, "OpenAI adapter: sending stream request");
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: this.buildHeaders(),
-      body: JSON.stringify(openaiRequest),
-    });
+    // Passing `options` keeps the caller's signal wired to the body: when
+    // the client disconnects, the upstream stream read below fails and the
+    // generator ends instead of consuming the rest of the response.
+    const response = await upstreamFetch(
+      url,
+      {
+        method: "POST",
+        headers: this.buildHeaders(),
+        body: JSON.stringify(openaiRequest),
+      },
+      options,
+    );
 
     if (!response.ok) {
       await this.handleError(response);

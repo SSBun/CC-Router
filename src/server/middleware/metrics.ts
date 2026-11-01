@@ -127,7 +127,7 @@ export class MetricsCollector {
       cacheReadTokens: usage?.cache_read_input_tokens ?? 0,
       toolCount,
       toolNames,
-      messageCount: request.messages.length,
+      messageCount: request.messages?.length ?? 0,
       hasThinking,
       thinkingBudget,
       systemLength,

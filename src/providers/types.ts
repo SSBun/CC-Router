@@ -82,14 +82,22 @@ export interface ProviderConfig {
   models?: ModelDef[];
 }
 
+export interface ProviderAdapterOptions {
+  /** Abort the upstream request when this signal aborts (e.g. the
+   * downstream client disconnects). */
+  signal?: AbortSignal;
+}
+
 export interface ProviderAdapter {
   send(
     request: AnthropicMessagesRequest,
     model: string,
+    options?: ProviderAdapterOptions,
   ): Promise<AnthropicMessagesResponse>;
   sendStream(
     request: AnthropicMessagesRequest,
     model: string,
+    options?: ProviderAdapterOptions,
   ): AsyncIterable<AnthropicSSEEvent>;
 }
 
