@@ -79,6 +79,9 @@ export class OpenAIAdapter implements ProviderAdapter {
     const openaiRequest = convertRequestToOpenAI(request);
     openaiRequest.model = model;
     openaiRequest.stream = true;
+    // Ask OpenAI-compatible backends to include real token usage in a
+    // trailing chunk (ignored by backends that don't support it).
+    openaiRequest.stream_options = { include_usage: true };
 
     logger.debug({ url, model }, "OpenAI adapter: sending stream request");
 

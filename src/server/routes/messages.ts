@@ -75,10 +75,42 @@ export function createMessagesHandler(
             }
             if (event.event === "message_delta") {
               const data = event.data as {
-                usage?: { output_tokens?: number };
+                usage?: {
+                  input_tokens?: number;
+                  output_tokens?: number;
+                  cache_creation_input_tokens?: number;
+                  cache_read_input_tokens?: number;
+                };
               };
-              if (streamUsage && data.usage?.output_tokens != null) {
-                streamUsage.output_tokens = data.usage.output_tokens;
+              // Some Anthropic-compatible gateways send placeholder zeros in
+              // message_start and only report the real usage in the final
+              // message_delta, so update every field that is present.
+              const deltaUsage = data.usage;
+              if (deltaUsage != null) {
+                if (streamUsage == null) {
+                  streamUsage = {
+                    input_tokens: deltaUsage.input_tokens ?? 0,
+                    output_tokens: 0,
+                    cache_creation_input_tokens:
+                      deltaUsage.cache_creation_input_tokens ?? 0,
+                    cache_read_input_tokens:
+                      deltaUsage.cache_read_input_tokens ?? 0,
+                  };
+                }
+                if (deltaUsage.input_tokens != null) {
+                  streamUsage.input_tokens = deltaUsage.input_tokens;
+                }
+                if (deltaUsage.output_tokens != null) {
+                  streamUsage.output_tokens = deltaUsage.output_tokens;
+                }
+                if (deltaUsage.cache_creation_input_tokens != null) {
+                  streamUsage.cache_creation_input_tokens =
+                    deltaUsage.cache_creation_input_tokens;
+                }
+                if (deltaUsage.cache_read_input_tokens != null) {
+                  streamUsage.cache_read_input_tokens =
+                    deltaUsage.cache_read_input_tokens;
+                }
               }
             }
 
