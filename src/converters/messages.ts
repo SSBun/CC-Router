@@ -26,6 +26,7 @@ export interface OpenAIChatCompletionRequest {
   messages: OpenAIChatMessage[];
   max_tokens: number;
   stream?: boolean;
+  stream_options?: { include_usage: boolean };
   temperature?: number;
   top_p?: number;
   stop?: string[];

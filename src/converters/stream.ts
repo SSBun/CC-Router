@@ -21,6 +21,8 @@ export async function* convertOpenAIStreamToAnthropic(
   const toolCalls = new Map<number, ToolCallBuffer>();
   let outputTokenCount = 0;
   let inputTokens = 0;
+  let completionTokens: number | null = null;
+  let stopReason: string | null = null;
 
   function closeOpenBlock(): AnthropicSSEEvent | null {
     if (openBlockIndex == null) return null;
@@ -46,7 +48,7 @@ export async function* convertOpenAIStreamToAnthropic(
           model,
           stop_reason: null,
           stop_sequence: null,
-          usage: { input_tokens: 0, output_tokens: 0 },
+          usage: { input_tokens: inputTokens, output_tokens: 0 },
         },
       },
     };
@@ -98,8 +100,14 @@ export async function* convertOpenAIStreamToAnthropic(
           event: "message_delta",
           data: {
             type: "message_delta",
-            delta: { stop_reason: "end_turn", stop_sequence: null },
-            usage: { output_tokens: outputTokenCount },
+            delta: {
+              stop_reason: stopReason ?? "end_turn",
+              stop_sequence: null,
+            },
+            usage: {
+              input_tokens: inputTokens,
+              output_tokens: completionTokens ?? outputTokenCount,
+            },
           },
         };
         yield {
@@ -115,6 +123,19 @@ export async function* convertOpenAIStreamToAnthropic(
       chunk = JSON.parse(sse.data);
     } catch {
       continue;
+    }
+
+    // Capture usage from any chunk. With stream_options.include_usage the
+    // trailing chunk (empty choices) carries the real prompt/completion
+    // token counts.
+    const usage = (chunk as {
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    }).usage;
+    if (usage != null) {
+      if (usage.prompt_tokens != null) inputTokens = usage.prompt_tokens;
+      if (usage.completion_tokens != null) {
+        completionTokens = usage.completion_tokens;
+      }
     }
 
     if (!messageStarted) {
@@ -215,25 +236,10 @@ export async function* convertOpenAIStreamToAnthropic(
         tool_calls: "tool_use",
         length: "max_tokens",
       };
-      const stopReason =
-        finishMap[choice.finish_reason] ?? choice.finish_reason;
-
-      const closeEvent = closeOpenBlock();
-      if (closeEvent != null) yield closeEvent;
-
-      yield {
-        event: "message_delta",
-        data: {
-          type: "message_delta",
-          delta: { stop_reason: stopReason, stop_sequence: null },
-          usage: { output_tokens: outputTokenCount },
-        },
-      };
-      yield {
-        event: "message_stop",
-        data: { type: "message_stop" },
-      };
-      return;
+      // Remember the stop reason but keep reading: with
+      // stream_options.include_usage a trailing usage chunk (followed by
+      // [DONE]) still arrives and it carries the real token counts.
+      stopReason = finishMap[choice.finish_reason] ?? choice.finish_reason;
     }
   }
 
@@ -245,8 +251,14 @@ export async function* convertOpenAIStreamToAnthropic(
       event: "message_delta",
       data: {
         type: "message_delta",
-        delta: { stop_reason: "end_turn", stop_sequence: null },
-        usage: { output_tokens: outputTokenCount },
+        delta: {
+          stop_reason: stopReason ?? "end_turn",
+          stop_sequence: null,
+        },
+        usage: {
+          input_tokens: inputTokens,
+          output_tokens: completionTokens ?? outputTokenCount,
+        },
       },
     };
     yield {
