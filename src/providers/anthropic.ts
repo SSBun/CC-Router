@@ -6,7 +6,9 @@ import type {
   AnthropicSSEEvent,
 } from "./types.js";
 import { parseSSEStream } from "../utils/sse.js";
+import { upstreamFetch } from "../utils/upstream-fetch.js";
 import { logger } from "../utils/logger.js";
+import type { ProviderAdapterOptions } from "./types.js";
 
 export class AnthropicAdapter implements ProviderAdapter {
   constructor(private config: ProviderConfig) {}
@@ -23,17 +25,22 @@ export class AnthropicAdapter implements ProviderAdapter {
   async send(
     request: AnthropicMessagesRequest,
     model: string,
+    options?: ProviderAdapterOptions,
   ): Promise<AnthropicMessagesResponse> {
     const url = `${this.config.base_url}/v1/messages`;
     const body = { ...request, model, stream: false };
 
     logger.debug({ url, model }, "Anthropic adapter: sending request");
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: this.buildHeaders(),
-      body: JSON.stringify(body),
-    });
+    const response = await upstreamFetch(
+      url,
+      {
+        method: "POST",
+        headers: this.buildHeaders(),
+        body: JSON.stringify(body),
+      },
+      options,
+    );
 
     if (!response.ok) {
       await this.handleError(response);
@@ -46,17 +53,25 @@ export class AnthropicAdapter implements ProviderAdapter {
   async *sendStream(
     request: AnthropicMessagesRequest,
     model: string,
+    options?: ProviderAdapterOptions,
   ): AsyncIterable<AnthropicSSEEvent> {
     const url = `${this.config.base_url}/v1/messages`;
     const body = { ...request, model, stream: true };
 
     logger.debug({ url, model }, "Anthropic adapter: sending stream request");
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: this.buildHeaders(),
-      body: JSON.stringify(body),
-    });
+    // Passing `options` keeps the caller's signal wired to the body: when
+    // the client disconnects, the upstream stream read below fails and the
+    // generator ends instead of consuming the rest of the response.
+    const response = await upstreamFetch(
+      url,
+      {
+        method: "POST",
+        headers: this.buildHeaders(),
+        body: JSON.stringify(body),
+      },
+      options,
+    );
 
     if (!response.ok) {
       await this.handleError(response);

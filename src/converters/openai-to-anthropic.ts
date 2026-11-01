@@ -42,6 +42,14 @@ export function convertResponseToAnthropic(
   model: string,
 ): AnthropicMessagesResponse {
   const choice = response.choices[0];
+  if (choice == null) {
+    // Some OpenAI-compatible endpoints return an empty choices array, e.g.
+    // when content filtering drops the completion. Fail loudly instead of
+    // crashing with a TypeError on `choice.message`.
+    throw new Error(
+      `OpenAI-compatible API returned no choices: ${JSON.stringify(response)}`,
+    );
+  }
   const message = choice.message;
   const content: AnthropicMessagesResponse["content"] = [];
 

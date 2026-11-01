@@ -53,9 +53,13 @@ export function createMessagesHandler(
         } | null = null;
 
         try {
+          // Wiring the client's request signal: when the downstream client
+          // disconnects, Hono aborts this signal and the upstream request is
+          // cancelled instead of streaming to nobody.
           for await (const event of adapter.sendStream(
             body,
             routeResolution.resolvedModel,
+            { signal: c.req.raw.signal },
           )) {
             // Capture usage from SSE events
             if (event.event === "message_start" && streamUsage === null) {
@@ -129,22 +133,31 @@ export function createMessagesHandler(
             isTrace,
           );
 
-          await stream.writeSSE({
-            event: "error",
-            data: JSON.stringify({
-              type: "error",
-              error: {
-                type: "api_error",
-                message: errMsg,
-              },
-            }),
-          });
+          // The client may be the one who disconnected (the abort was
+          // propagated upstream) — writing an error event to a dead
+          // client is pointless and can throw.
+          if (!c.req.raw.signal.aborted) {
+            await stream.writeSSE({
+              event: "error",
+              data: JSON.stringify({
+                type: "error",
+                error: {
+                  type: "api_error",
+                  message: errMsg,
+                },
+              }),
+            });
+          }
         }
       });
     }
 
     try {
-      const response = await adapter.send(body, routeResolution.resolvedModel);
+      const response = await adapter.send(
+        body,
+        routeResolution.resolvedModel,
+        { signal: c.req.raw.signal },
+      );
       const latencyMs = Date.now() - startTime;
       metrics.record(
         body,
